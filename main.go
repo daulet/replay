@@ -41,14 +41,53 @@ func main() {
 func handle(in net.Conn, out net.Conn) {
 	defer in.Close()
 
-	tee := io.TeeReader(in, os.Stdout)
+	reqTee := &lineTeeWriter{
+		dst:       out,
+		modDst:    os.Stdout,
+		modPrefix: "request: ",
+		newline:   true,
+	}
+
+	resTee := &lineTeeWriter{
+		dst:       in,
+		modDst:    os.Stdout,
+		modPrefix: "response: ",
+		newline:   true,
+	}
 
 	go func() {
-		if _, err := io.Copy(out, tee); err != nil {
+		if _, err := io.Copy(reqTee, in); err != nil {
 			log.Printf("write from in to out: %v", err)
 		}
 	}()
-	if _, err := io.Copy(in, out); err != nil {
+	if _, err := io.Copy(resTee, out); err != nil {
 		log.Printf("write from out to in: %v", err)
 	}
+}
+
+type lineTeeWriter struct {
+	dst       io.Writer
+	modDst    io.Writer
+	modPrefix string
+	newline   bool
+}
+
+func (lw *lineTeeWriter) Write(p []byte) (int, error) {
+	n, err := lw.dst.Write(p)
+	if err != nil {
+		return n, err
+	}
+	for i, b := range p {
+		if lw.newline {
+			if _, err := lw.modDst.Write([]byte(lw.modPrefix)); err != nil {
+				return i, err
+			}
+			lw.newline = false
+		}
+		if _, err := lw.modDst.Write([]byte{b}); err != nil {
+			return i, err
+		}
+		lw.newline = b == '\n'
+	}
+	return len(p), nil
 }
