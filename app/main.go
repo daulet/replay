@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"os"
 
 	"github.com/daulet/redisreplay"
 )
@@ -36,6 +35,8 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		conn = redisreplay.NewRecorder(conn.(*net.TCPConn), "response: ")
+		target = redisreplay.NewRecorder(target.(*net.TCPConn), "request: ")
 		go handle(conn, target)
 	}
 }
@@ -43,15 +44,12 @@ func main() {
 func handle(in net.Conn, out net.Conn) {
 	defer in.Close()
 
-	reqTee := redisreplay.NewTeeWriter(out, os.Stdout, "request: ")
-	resTee := redisreplay.NewTeeWriter(in, os.Stdout, "response: ")
-
 	go func() {
-		if _, err := io.Copy(reqTee, in); err != nil {
+		if _, err := io.Copy(out, in); err != nil {
 			log.Printf("write from in to out: %v", err)
 		}
 	}()
-	if _, err := io.Copy(resTee, out); err != nil {
+	if _, err := io.Copy(in, out); err != nil {
 		log.Printf("write from out to in: %v", err)
 	}
 }
