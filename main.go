@@ -41,19 +41,9 @@ func main() {
 func handle(in net.Conn, out net.Conn) {
 	defer in.Close()
 
-	reqTee := &lineTeeWriter{
-		dst:       out,
-		modDst:    os.Stdout,
-		modPrefix: "request: ",
-		newline:   true,
-	}
+	reqTee := NewTeedWriter(out, os.Stdout, "request: ")
 
-	resTee := &lineTeeWriter{
-		dst:       in,
-		modDst:    os.Stdout,
-		modPrefix: "response: ",
-		newline:   true,
-	}
+	resTee := NewTeedWriter(in, os.Stdout, "response: ")
 
 	go func() {
 		if _, err := io.Copy(reqTee, in); err != nil {
@@ -70,6 +60,17 @@ type lineTeeWriter struct {
 	modDst    io.Writer
 	modPrefix string
 	newline   bool
+}
+
+var _ io.Writer = (*lineTeeWriter)(nil)
+
+func NewTeedWriter(dst io.Writer, modDst io.Writer, prefix string) io.Writer {
+	return &lineTeeWriter{
+		dst:       dst,
+		modDst:    modDst,
+		modPrefix: prefix,
+		newline:   true,
+	}
 }
 
 func (lw *lineTeeWriter) Write(p []byte) (int, error) {
