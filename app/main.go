@@ -10,19 +10,19 @@ import (
 	"github.com/daulet/redisreplay"
 )
 
-// $ go run app/main.go --port 8080 --dest localhost:6379
+// $ go run app/main.go --port 8080 --target localhost:6379
 // $ redis-cli -p 8080
 
 func main() {
-	dest := flag.String("dest", "", "destination host:port")
+	target := flag.String("target", "", "target host:port")
 	port := flag.Int("port", 0, "port to listen on")
 	flag.Parse()
 
-	target, err := net.Dial("tcp", *dest)
+	dst, err := net.Dial("tcp", *target)
 	if err != nil {
 		panic(err)
 	}
-	defer target.Close()
+	defer dst.Close()
 
 	lstr, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 	if err != nil {
@@ -35,21 +35,20 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		conn = redisreplay.NewRecorder(conn.(*net.TCPConn), "response: ")
-		target = redisreplay.NewRecorder(target.(*net.TCPConn), "request: ")
-		go handle(conn, target)
+		src := redisreplay.NewRecorder(conn.(*net.TCPConn))
+		go handle(src, dst)
 	}
 }
 
-func handle(in net.Conn, out net.Conn) {
-	defer in.Close()
+func handle(src io.ReadWriteCloser, dst io.ReadWriter) {
+	defer src.Close()
 
 	go func() {
-		if _, err := io.Copy(out, in); err != nil {
+		if _, err := io.Copy(dst, src); err != nil {
 			log.Printf("write from in to out: %v", err)
 		}
 	}()
-	if _, err := io.Copy(in, out); err != nil {
+	if _, err := io.Copy(src, dst); err != nil {
 		log.Printf("write from out to in: %v", err)
 	}
 }
