@@ -16,13 +16,8 @@ import (
 func main() {
 	target := flag.String("target", "", "target host:port")
 	port := flag.Int("port", 0, "port to listen on")
+	record := flag.Bool("record", false, "record traffic")
 	flag.Parse()
-
-	dst, err := net.Dial("tcp", *target)
-	if err != nil {
-		panic(err)
-	}
-	defer dst.Close()
 
 	lstr, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 	if err != nil {
@@ -30,13 +25,16 @@ func main() {
 	}
 	defer lstr.Close()
 
-	for {
-		conn, err := lstr.Accept()
+	var dst io.ReadWriter
+	if *record {
+		remote, err := net.Dial("tcp", *target)
 		if err != nil {
 			panic(err)
 		}
-		src := redisreplay.NewRecorder(
-			conn.(*net.TCPConn),
+		defer remote.Close()
+
+		dst = redisreplay.NewRecorder(
+			remote.(*net.TCPConn),
 			func(reqID int) string {
 				return fmt.Sprintf("testdata/%d.request", reqID)
 			},
@@ -44,6 +42,18 @@ func main() {
 				return fmt.Sprintf("testdata/%d.response", reqID)
 			},
 		)
+	} else {
+		dst, err = redisreplay.NewReplayer()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	for {
+		src, err := lstr.Accept()
+		if err != nil {
+			panic(err)
+		}
 		go handle(src, dst)
 	}
 }

@@ -23,8 +23,9 @@ type FilenameFunc func(reqID int) string
 func NewRecorder(conn *net.TCPConn, reqFileFunc, respFileFunc FilenameFunc) io.ReadWriteCloser {
 	writer := NewWriter(reqFileFunc, respFileFunc)
 
-	reqTee := NewTeeWriter(io.Discard, writer.RequestWriter(), "")
-	resTee := NewTeeWriter(conn, writer.ResponseWriter(), "")
+	// TODO there is no reason this shouldn't work on Postgres
+	reqTee := NewTeeWriter(conn, writer.RequestWriter(), "")
+	resTee := NewTeeWriter(io.Discard, writer.ResponseWriter(), "")
 
 	return readWriteCloserOnly{
 		&Recorder{
@@ -40,17 +41,17 @@ func NewRecorder(conn *net.TCPConn, reqFileFunc, respFileFunc FilenameFunc) io.R
 var _ net.Conn = (*Recorder)(nil)
 
 func (r *Recorder) ReadFrom(rdr io.Reader) (int64, error) {
-	return io.Copy(r.reqTee, rdr)
+	return io.Copy(r.resTee, rdr)
 }
 
 func (r *Recorder) Read(p []byte) (int, error) {
 	n, err := r.TCPConn.Read(p)
-	r.reqTee.Write(p[:n])
+	r.resTee.Write(p[:n])
 	return n, err
 }
 
 func (r *Recorder) Write(p []byte) (int, error) {
-	return r.resTee.Write(p)
+	return r.reqTee.Write(p)
 }
 
 func (r *Recorder) Close() error {
