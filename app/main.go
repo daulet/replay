@@ -35,7 +35,15 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		src := redisreplay.NewRecorder(conn.(*net.TCPConn))
+		src := redisreplay.NewRecorder(
+			conn.(*net.TCPConn),
+			func(reqID int) string {
+				return fmt.Sprintf("testdata/%d.request", reqID)
+			},
+			func(reqID int) string {
+				return fmt.Sprintf("testdata/%d.response", reqID)
+			},
+		)
 		go handle(src, dst)
 	}
 }

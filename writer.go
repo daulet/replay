@@ -1,7 +1,6 @@
 package redisreplay
 
 import (
-	"fmt"
 	"io"
 	"os"
 )
@@ -17,19 +16,18 @@ func (w *funcWriter) Write(p []byte) (int, error) {
 }
 
 type writer struct {
-	// TODO allow users to provide factory to create io.Writer per request/response pair
-	w io.Writer
+	reqFilenameFunc  FilenameFunc
+	respFilenameFunc FilenameFunc
 
-	reqID           int
-	writingResponse bool
-	reqWriter       io.WriteCloser
-	respWriter      io.WriteCloser
+	reqID      int
+	reqWriter  io.WriteCloser
+	respWriter io.WriteCloser
 }
 
-func NewWriter() *writer {
+func NewWriter(reqFilenameFunc, respFilenameFunc FilenameFunc) *writer {
 	return &writer{
-		w:               os.Stdout,
-		writingResponse: true,
+		reqFilenameFunc:  reqFilenameFunc,
+		respFilenameFunc: respFilenameFunc,
 	}
 }
 
@@ -59,7 +57,7 @@ func (w *writer) writeRequest(p []byte) (int, error) {
 			w.respWriter = nil
 		}
 
-		f, err := os.Create(fmt.Sprintf("%d.request", w.reqID))
+		f, err := os.Create(w.reqFilenameFunc(w.reqID))
 		if err != nil {
 			return 0, err
 		}
@@ -77,7 +75,7 @@ func (w *writer) writeResponse(p []byte) (int, error) {
 			w.reqWriter = nil
 		}
 
-		f, err := os.Create(fmt.Sprintf("%d.response", w.reqID-1))
+		f, err := os.Create(w.respFilenameFunc(w.reqID - 1))
 		if err != nil {
 			return 0, err
 		}

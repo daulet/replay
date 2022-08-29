@@ -18,8 +18,10 @@ type Recorder struct {
 	resTee io.Writer
 }
 
-func NewRecorder(conn *net.TCPConn) io.ReadWriteCloser {
-	writer := NewWriter()
+type FilenameFunc func(reqID int) string
+
+func NewRecorder(conn *net.TCPConn, reqFileFunc, respFileFunc FilenameFunc) io.ReadWriteCloser {
+	writer := NewWriter(reqFileFunc, respFileFunc)
 
 	reqTee := NewTeeWriter(io.Discard, writer.RequestWriter(), "")
 	resTee := NewTeeWriter(conn, writer.ResponseWriter(), "")
