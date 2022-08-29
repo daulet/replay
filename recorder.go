@@ -2,9 +2,7 @@ package redisreplay
 
 import (
 	"io"
-	"io/ioutil"
 	"net"
-	"os"
 )
 
 // hide the TCPConn methods we don't want to expose, e.g. ReadFrom
@@ -12,28 +10,24 @@ type readWriteCloserOnly struct {
 	io.ReadWriteCloser
 }
 
-// TODO need to differentiate between request and response callers
 type Recorder struct {
 	net.TCPConn
-	// TODO allow users to provide factory to create io.Writer per request/response pair
-	writer io.Writer
+	writer *writer
 
 	reqTee io.Writer
 	resTee io.Writer
-
-	reqID int
 }
 
 func NewRecorder(conn *net.TCPConn) io.ReadWriteCloser {
-	writer := os.Stdout
-	reqTee := NewTeeWriter(ioutil.Discard, writer, "request: ")
-	resTee := NewTeeWriter(conn, writer, "response: ")
+	writer := NewWriter()
+
+	reqTee := NewTeeWriter(io.Discard, writer.RequestWriter(), "request: ")
+	resTee := NewTeeWriter(conn, writer.ResponseWriter(), "response: ")
 
 	return readWriteCloserOnly{
 		&Recorder{
 			TCPConn: *conn,
 			writer:  writer,
-			reqID:   0,
 
 			reqTee: reqTee,
 			resTee: resTee,
