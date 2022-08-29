@@ -11,11 +11,9 @@ import (
 )
 
 type matcher struct {
-	reqLen int
-	buffer *bytes.Buffer
-	output *bytes.Buffer
-	// TODO revert back to using Buffer (output)
-	output2   []byte
+	reqLen    int
+	buffer    *bytes.Buffer
+	output    *bytes.Buffer
 	responses map[[32]byte][]byte
 }
 
@@ -65,10 +63,10 @@ func NewMatcher() (*matcher, error) {
 }
 
 func (m *matcher) Read(p []byte) (int, error) {
-	// we stay on CPU unless we don't emitate latency
+	// we stay on CPU unless we don't imitate latency
 	<-time.After(time.Millisecond)
-	n := copy(p, m.output2)
-	m.output2 = m.output2[n:]
+	// Read can return EOF
+	n, _ := m.output.Read(p)
 	return n, nil
 }
 
@@ -95,13 +93,12 @@ func (m *matcher) WriteLine(line []byte) (n int, err error) {
 	hash := sha256.Sum256(req)
 	m.buffer.Reset()
 	if resp, ok := m.responses[hash]; ok {
-		m.output2 = append(m.output2, resp...)
 		m.output.Write(resp)
 		return
 	}
 	fmt.Printf("no response found for request %x\n", hash)
 	fmt.Println(string(req))
 	// Null Bulk String
-	m.output2 = append(m.output2, []byte("$-1\r\n")...)
+	m.output.Write([]byte("$-1\r\n"))
 	return
 }
