@@ -21,8 +21,8 @@ type Recorder struct {
 func NewRecorder(conn *net.TCPConn) io.ReadWriteCloser {
 	writer := NewWriter()
 
-	reqTee := NewTeeWriter(io.Discard, writer.RequestWriter(), "request: ")
-	resTee := NewTeeWriter(conn, writer.ResponseWriter(), "response: ")
+	reqTee := NewTeeWriter(io.Discard, writer.RequestWriter(), "")
+	resTee := NewTeeWriter(conn, writer.ResponseWriter(), "")
 
 	return readWriteCloserOnly{
 		&Recorder{

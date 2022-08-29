@@ -22,6 +22,8 @@ type writer struct {
 
 	reqID           int
 	writingResponse bool
+	reqWriter       io.WriteCloser
+	respWriter      io.WriteCloser
 }
 
 func NewWriter() *writer {
@@ -44,24 +46,42 @@ func (w *writer) ResponseWriter() io.Writer {
 }
 
 func (w *writer) Close() error {
-	// TODO do we need to close a file?
+	if w.respWriter != nil {
+		return w.respWriter.Close()
+	}
 	return nil
 }
 
 func (w *writer) writeRequest(p []byte) (int, error) {
-	if w.writingResponse {
-		w.writingResponse = false
+	if w.reqWriter == nil {
+		if w.respWriter != nil {
+			w.respWriter.Close()
+			w.respWriter = nil
+		}
 
-		w.w.Write([]byte("--------\n"))
-		w.w.Write([]byte(fmt.Sprintf("request %d\n", w.reqID)))
-		w.w.Write([]byte("--------\n"))
+		f, err := os.Create(fmt.Sprintf("%d.request", w.reqID))
+		if err != nil {
+			return 0, err
+		}
+		w.reqWriter = f
 
 		w.reqID++
 	}
-	return w.w.Write(p)
+	return w.reqWriter.Write(p)
 }
 
 func (w *writer) writeResponse(p []byte) (int, error) {
-	w.writingResponse = true
-	return w.w.Write(p)
+	if w.respWriter == nil {
+		if w.reqWriter != nil {
+			w.reqWriter.Close()
+			w.reqWriter = nil
+		}
+
+		f, err := os.Create(fmt.Sprintf("%d.response", w.reqID-1))
+		if err != nil {
+			return 0, err
+		}
+		w.respWriter = f
+	}
+	return w.respWriter.Write(p)
 }
