@@ -1,0 +1,2 @@
+Redis protocol good reference:
+https://github.com/go-redis/redis/blob/master/internal/proto/reader.go#L16-L32

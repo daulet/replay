@@ -33,6 +33,7 @@ func main() {
 		}
 		defer remote.Close()
 
+		// TODO this should be a distinct service
 		dst = redisreplay.NewRecorder(
 			remote.(*net.TCPConn),
 			func(reqID int) string {
@@ -58,6 +59,7 @@ func main() {
 	}
 }
 
+// TODO add transparency logger, that just prints out all comms
 func handle(src io.ReadWriteCloser, dst io.ReadWriter) {
 	defer src.Close()
 
