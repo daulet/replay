@@ -10,15 +10,34 @@ import (
 	"time"
 )
 
+type Mode int
+
+const (
+	ModeRecord Mode = iota + 1
+	ModeReplay
+)
+
 type redisProxy struct {
-	port       int
-	remoteAddr string
+	mode         Mode
+	port         int
+	remoteAddr   string
+	reqFileFunc  FilenameFunc
+	respFileFunc FilenameFunc
 }
 
-func NewRedisProxy(port int, remoteAddr string) *redisProxy {
+func NewRedisProxy(
+	mode Mode,
+	port int,
+	remoteAddr string,
+	reqFileFunc FilenameFunc,
+	respFileFunc FilenameFunc,
+) *redisProxy {
 	return &redisProxy{
-		port:       port,
-		remoteAddr: remoteAddr,
+		mode:         mode,
+		port:         port,
+		remoteAddr:   remoteAddr,
+		reqFileFunc:  reqFileFunc,
+		respFileFunc: respFileFunc,
 	}
 }
 
@@ -41,17 +60,20 @@ func (p *redisProxy) Serve(ctx context.Context) error {
 		defer conn.Close()
 		remote = conn.(*net.TCPConn)
 	}
-	rec := NewRecorder(
-		remote,
-		// TODO make configurable
-		func(reqID int) string {
-			return fmt.Sprintf("testdata/%d.request", reqID)
-		},
-		func(reqID int) string {
-			return fmt.Sprintf("testdata/%d.response", reqID)
-		},
-	)
-	defer rec.Close()
+	var rw io.ReadWriteCloser
+	switch p.mode {
+	case ModeRecord:
+		rw = NewRecorder(remote, p.reqFileFunc, p.respFileFunc)
+	case ModeReplay:
+		rep, err := NewReplayer()
+		if err != nil {
+			return err
+		}
+		rw = rep
+	default:
+		return fmt.Errorf("unknown mode: %d", p.mode)
+	}
+	defer rw.Close()
 	var wg sync.WaitGroup
 	for {
 		select {
@@ -70,12 +92,13 @@ func (p *redisProxy) Serve(ctx context.Context) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			handle(src, rec)
+			handle(src, rw)
 			src.Close()
 		}()
 	}
 }
 
+// TODO add transparency logger, that just prints out all comms
 func handle(src io.ReadWriteCloser, dst io.ReadWriter) {
 	go func() {
 		if _, err := io.Copy(dst, src); err != nil {

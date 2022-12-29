@@ -1,9 +1,9 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net"
 
@@ -14,9 +14,12 @@ import (
 // $ redis-cli -p 8080
 
 func main() {
-	target := flag.String("target", "", "target host:port")
-	port := flag.Int("port", 0, "port to listen on")
-	record := flag.Bool("record", false, "record traffic")
+	var (
+		ctx    = context.Background()
+		record = flag.Bool("record", false, "record traffic")
+		port   = flag.Int("port", 0, "port to listen on")
+		target = flag.String("target", "", "target host:port")
+	)
 	flag.Parse()
 
 	lstr, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
@@ -25,50 +28,19 @@ func main() {
 	}
 	defer lstr.Close()
 
-	var dst io.ReadWriter
+	mode := redisreplay.ModeReplay
 	if *record {
-		remote, err := net.Dial("tcp", *target)
-		if err != nil {
-			panic(err)
-		}
-		defer remote.Close()
-
-		// TODO this should be a distinct service
-		dst = redisreplay.NewRecorder(
-			remote.(*net.TCPConn),
-			func(reqID int) string {
-				return fmt.Sprintf("testdata/%d.request", reqID)
-			},
-			func(reqID int) string {
-				return fmt.Sprintf("testdata/%d.response", reqID)
-			},
-		)
-	} else {
-		dst, err = redisreplay.NewReplayer()
-		if err != nil {
-			panic(err)
-		}
+		mode = redisreplay.ModeRecord
 	}
-
-	for {
-		src, err := lstr.Accept()
-		if err != nil {
-			panic(err)
-		}
-		go handle(src, dst)
-	}
-}
-
-// TODO add transparency logger, that just prints out all comms
-func handle(src io.ReadWriteCloser, dst io.ReadWriter) {
-	defer src.Close()
-
-	go func() {
-		if _, err := io.Copy(dst, src); err != nil {
-			log.Printf("write from in to out: %v", err)
-		}
-	}()
-	if _, err := io.Copy(src, dst); err != nil {
-		log.Printf("write from out to in: %v", err)
+	srv := redisreplay.NewRedisProxy(mode, *port, *target,
+		func(reqID int) string {
+			return fmt.Sprintf("testdata/%d.request", reqID)
+		},
+		func(reqID int) string {
+			return fmt.Sprintf("testdata/%d.response", reqID)
+		},
+	)
+	if err := srv.Serve(ctx); err != nil {
+		log.Fatal(err)
 	}
 }
