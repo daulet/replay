@@ -90,6 +90,10 @@ func TestSimple(t *testing.T) {
 			}
 			assert.Equal(t, []string{"key"}, vals)
 
+			// reset state so tests can be run multiple times
+			if err := rdb.FlushDB(ctx).Err(); err != nil {
+				t.Fatal(err)
+			}
 			rdb.Close() // close connection to proxy
 			cancel()    // stop proxy
 			wg.Wait()   // wait for proxy to stop
