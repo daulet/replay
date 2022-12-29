@@ -7,12 +7,14 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 )
 
 type matcher struct {
 	reqLen    int
 	buffer    *bytes.Buffer
+	outMux    sync.RWMutex
 	output    *bytes.Buffer
 	responses map[[32]byte][][]byte
 }
@@ -62,6 +64,8 @@ func NewMatcher() (*matcher, error) {
 func (m *matcher) Read(p []byte) (int, error) {
 	// we stay on CPU unless we don't imitate latency
 	<-time.After(time.Millisecond)
+	m.outMux.RLock()
+	defer m.outMux.RUnlock()
 	return m.output.Read(p)
 }
 
@@ -90,12 +94,15 @@ func (m *matcher) WriteLine(line []byte) (n int, err error) {
 	if resp, ok := m.responses[hash]; ok && len(resp) > 0 {
 		oldest := resp[0]
 		m.responses[hash] = resp[1:]
+		m.outMux.Lock()
 		m.output.Write(oldest)
+		m.outMux.Unlock()
 		return
 	}
 	fmt.Printf("no response found or previously exhaused by the same request %x\n", hash)
 	fmt.Println(string(req))
-	// Null Bulk String
-	m.output.Write([]byte("$-1\r\n"))
+	m.outMux.Lock()
+	m.output.Write([]byte("$-1\r\n")) // Null Bulk String
+	m.outMux.Unlock()
 	return
 }

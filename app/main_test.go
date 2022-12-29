@@ -90,8 +90,9 @@ func TestSimple(t *testing.T) {
 			}
 			assert.Equal(t, []string{"key"}, vals)
 
-			cancel()
-			wg.Wait()
+			rdb.Close() // close connection to proxy
+			cancel()    // stop proxy
+			wg.Wait()   // wait for proxy to stop
 		})
 	}
 }

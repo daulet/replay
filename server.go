@@ -42,6 +42,9 @@ func NewRedisProxy(
 }
 
 func (p *redisProxy) Serve(ctx context.Context) error {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	var lstr *net.TCPListener
 	{
 		l, err := net.Listen("tcp", fmt.Sprintf(":%d", p.port))
@@ -51,37 +54,40 @@ func (p *redisProxy) Serve(ctx context.Context) error {
 		defer l.Close()
 		lstr = l.(*net.TCPListener)
 	}
+
 	var rw io.ReadWriteCloser
-	switch p.mode {
-	case ModeRecord:
-		var remote *net.TCPConn
-		{
-			conn, err := net.Dial("tcp", p.remoteAddr)
+	{
+		switch p.mode {
+		case ModeRecord:
+			var remote *net.TCPConn
+			{
+				conn, err := net.Dial("tcp", p.remoteAddr)
+				if err != nil {
+					return err
+				}
+				defer conn.Close()
+				remote = conn.(*net.TCPConn)
+			}
+			rw = NewRecorder(remote, p.reqFileFunc, p.respFileFunc)
+		case ModeReplay:
+			rep, err := NewReplayer()
 			if err != nil {
 				return err
 			}
-			defer conn.Close()
-			remote = conn.(*net.TCPConn)
+			rw = rep
+		default:
+			return fmt.Errorf("unknown mode: %d", p.mode)
 		}
-		rw = NewRecorder(remote, p.reqFileFunc, p.respFileFunc)
-	case ModeReplay:
-		rep, err := NewReplayer()
-		if err != nil {
-			return err
-		}
-		rw = rep
-	default:
-		return fmt.Errorf("unknown mode: %d", p.mode)
 	}
 	defer rw.Close()
-	var wg sync.WaitGroup
+
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		default:
 		}
-		lstr.SetDeadline(time.Now().Add(1 * time.Second))
+		lstr.SetDeadline(time.Now().Add(100 * time.Millisecond))
 		src, err := lstr.Accept()
 		if err != nil {
 			if ne, ok := err.(net.Error); ok && !ne.Timeout() {
