@@ -80,7 +80,7 @@ func (p *redisProxy) Serve(ctx context.Context) error {
 			}
 			rw = NewRecorder(remote, p.reqFileFunc, p.respFileFunc)
 		case ModeReplay:
-			rep, err := NewReplayer()
+			rep, err := NewReplayer(p.reqFileFunc, p.respFileFunc)
 			if err != nil {
 				return err
 			}

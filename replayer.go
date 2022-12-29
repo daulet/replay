@@ -22,18 +22,15 @@ type matcher struct {
 
 var _ io.ReadWriteCloser = (*matcher)(nil)
 
-// TODO unexport functions that don't need to be exported
 // TODO better, controlled logging
-func NewReplayer() (io.ReadWriteCloser, error) {
-	// TODO feed from user
-	dir := "testdata"
+func NewReplayer(reqFileFunc, respFileFunc FilenameFunc) (io.ReadWriteCloser, error) {
 	var (
 		reqID     int
 		err       error
 		responses = make(map[[32]byte][][]byte)
 	)
 	for err == nil {
-		f, err := os.Open(fmt.Sprintf("%s/%d.request", dir, reqID))
+		f, err := os.Open(reqFileFunc(reqID))
 		if err != nil {
 			break
 		}
@@ -43,7 +40,7 @@ func NewReplayer() (io.ReadWriteCloser, error) {
 		}
 		f.Close()
 
-		f, err = os.Open(fmt.Sprintf("%s/%d.response", dir, reqID))
+		f, err = os.Open(respFileFunc(reqID))
 		if err != nil {
 			return nil, err
 		}
