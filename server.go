@@ -51,18 +51,18 @@ func (p *redisProxy) Serve(ctx context.Context) error {
 		defer l.Close()
 		lstr = l.(*net.TCPListener)
 	}
-	var remote *net.TCPConn
-	{
-		conn, err := net.Dial("tcp", p.remoteAddr)
-		if err != nil {
-			return err
-		}
-		defer conn.Close()
-		remote = conn.(*net.TCPConn)
-	}
 	var rw io.ReadWriteCloser
 	switch p.mode {
 	case ModeRecord:
+		var remote *net.TCPConn
+		{
+			conn, err := net.Dial("tcp", p.remoteAddr)
+			if err != nil {
+				return err
+			}
+			defer conn.Close()
+			remote = conn.(*net.TCPConn)
+		}
 		rw = NewRecorder(remote, p.reqFileFunc, p.respFileFunc)
 	case ModeReplay:
 		rep, err := NewReplayer()

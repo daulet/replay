@@ -9,12 +9,12 @@ import (
 	"testing"
 
 	"github.com/daulet/redisreplay"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
+	"github.com/stretchr/testify/assert"
 )
-
-// TODO test should use redis client to generate calls, passthrough for recording, retest on replay
 
 var redisPort string
 
@@ -66,18 +66,29 @@ func TestSimple(t *testing.T) {
 				DB:       0,  // use default DB
 			})
 
-			if err := rdb.Keys(ctx, "*").Err(); err != nil {
+			vals, err := rdb.Keys(ctx, "*").Result()
+			if err != nil {
 				t.Fatal(err)
 			}
-			if err := rdb.Set(ctx, "key", "value", 0).Err(); err != nil {
+			assert.Equal(t, []string{}, vals)
+
+			val, err := rdb.Set(ctx, "key", "value", 0).Result()
+			if err != nil {
 				t.Fatal(err)
 			}
-			if err := rdb.Get(ctx, "key").Err(); err != nil {
+			assert.Equal(t, "OK", val)
+
+			val, err = rdb.Get(ctx, "key").Result()
+			if err != nil {
 				t.Fatal(err)
 			}
-			if err := rdb.Keys(ctx, "*").Err(); err != nil {
+			assert.Equal(t, "value", val)
+
+			vals, err = rdb.Keys(ctx, "*").Result()
+			if err != nil {
 				t.Fatal(err)
 			}
+			assert.Equal(t, []string{"key"}, vals)
 
 			cancel()
 			wg.Wait()

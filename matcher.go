@@ -14,7 +14,7 @@ type matcher struct {
 	reqLen    int
 	buffer    *bytes.Buffer
 	output    *bytes.Buffer
-	responses map[[32]byte][]byte
+	responses map[[32]byte][][]byte
 }
 
 // TODO unexport functions that don't need to be exported
@@ -25,7 +25,7 @@ func NewMatcher() (*matcher, error) {
 	var (
 		reqID     int
 		err       error
-		responses = make(map[[32]byte][]byte)
+		responses = make(map[[32]byte][][]byte)
 	)
 	for err == nil {
 		f, err := os.Open(fmt.Sprintf("%s/%d.request", dir, reqID))
@@ -48,10 +48,7 @@ func NewMatcher() (*matcher, error) {
 		}
 		f.Close()
 		hash := sha256.Sum256(req)
-		// TODO could be multiple responses for the same request, preserve order
-		responses[hash] = resp
-		fmt.Printf("loaded request %d, hash %x\n", reqID, hash)
-		fmt.Println(string(req))
+		responses[hash] = append(responses[hash], resp)
 		reqID++
 	}
 
@@ -65,9 +62,7 @@ func NewMatcher() (*matcher, error) {
 func (m *matcher) Read(p []byte) (int, error) {
 	// we stay on CPU unless we don't imitate latency
 	<-time.After(time.Millisecond)
-	// Read can return EOF
-	n, _ := m.output.Read(p)
-	return n, nil
+	return m.output.Read(p)
 }
 
 // Redis request format
@@ -92,11 +87,13 @@ func (m *matcher) WriteLine(line []byte) (n int, err error) {
 	req := m.buffer.Bytes()
 	hash := sha256.Sum256(req)
 	m.buffer.Reset()
-	if resp, ok := m.responses[hash]; ok {
-		m.output.Write(resp)
+	if resp, ok := m.responses[hash]; ok && len(resp) > 0 {
+		oldest := resp[0]
+		m.responses[hash] = resp[1:]
+		m.output.Write(oldest)
 		return
 	}
-	fmt.Printf("no response found for request %x\n", hash)
+	fmt.Printf("no response found or previously exhaused by the same request %x\n", hash)
 	fmt.Println(string(req))
 	// Null Bulk String
 	m.output.Write([]byte("$-1\r\n"))

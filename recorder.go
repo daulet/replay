@@ -27,6 +27,7 @@ func NewRecorder(conn *net.TCPConn, reqFileFunc, respFileFunc FilenameFunc) io.R
 
 	// TODO there is no reason this shouldn't work on Postgres
 	reqTee := NewTeeWriter(conn, writer.RequestWriter(), "")
+	// TODO understand why this doesn't require conn
 	resTee := NewTeeWriter(io.Discard, writer.ResponseWriter(), "")
 
 	return readWriteCloserOnly{
@@ -60,6 +61,7 @@ func (r *Recorder) Write(p []byte) (int, error) {
 		return 0, io.EOF
 	default:
 	}
+	// TODO why we never write to r.TCPConn?
 	return r.reqTee.Write(p)
 }
 
