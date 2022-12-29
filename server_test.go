@@ -1,4 +1,4 @@
-package main_test
+package redisreplay_test
 
 import (
 	"context"
