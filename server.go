@@ -7,7 +7,10 @@ import (
 	"log"
 	"net"
 	"sync"
+	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 type Mode int
@@ -47,7 +50,14 @@ func (p *redisProxy) Serve(ctx context.Context) error {
 
 	var lstr *net.TCPListener
 	{
-		l, err := net.Listen("tcp", fmt.Sprintf(":%d", p.port))
+		cfg := &net.ListenConfig{Control: func(_, _ string, conn syscall.RawConn) error {
+			return conn.Control(func(descriptor uintptr) {
+				if err := syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, unix.SO_REUSEPORT, 1); err != nil {
+					return
+				}
+			})
+		}}
+		l, err := cfg.Listen(ctx, "tcp", fmt.Sprintf(":%d", p.port))
 		if err != nil {
 			return err
 		}
