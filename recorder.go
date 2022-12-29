@@ -6,6 +6,7 @@ import (
 )
 
 // hide the TCPConn methods we don't want to expose, e.g. ReadFrom
+// TODO why did we do this? What's wrong with using ReadFrom?
 type readWriteCloserOnly struct {
 	io.ReadWriteCloser
 }
@@ -13,6 +14,7 @@ type readWriteCloserOnly struct {
 type Recorder struct {
 	net.TCPConn
 	writer *writer
+	closed chan struct{}
 
 	reqTee io.Writer
 	resTee io.Writer
@@ -31,6 +33,7 @@ func NewRecorder(conn *net.TCPConn, reqFileFunc, respFileFunc FilenameFunc) io.R
 		&Recorder{
 			TCPConn: *conn,
 			writer:  writer,
+			closed:  make(chan struct{}),
 
 			reqTee: reqTee,
 			resTee: resTee,
@@ -40,20 +43,27 @@ func NewRecorder(conn *net.TCPConn, reqFileFunc, respFileFunc FilenameFunc) io.R
 
 var _ net.Conn = (*Recorder)(nil)
 
-func (r *Recorder) ReadFrom(rdr io.Reader) (int64, error) {
-	return io.Copy(r.resTee, rdr)
-}
-
 func (r *Recorder) Read(p []byte) (int, error) {
+	select {
+	case <-r.closed:
+		return 0, io.EOF
+	default:
+	}
 	n, err := r.TCPConn.Read(p)
 	r.resTee.Write(p[:n])
 	return n, err
 }
 
 func (r *Recorder) Write(p []byte) (int, error) {
+	select {
+	case <-r.closed:
+		return 0, io.EOF
+	default:
+	}
 	return r.reqTee.Write(p)
 }
 
 func (r *Recorder) Close() error {
+	close(r.closed)
 	return r.TCPConn.Close()
 }

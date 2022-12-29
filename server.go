@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -50,6 +51,8 @@ func (p *redisProxy) Serve(ctx context.Context) error {
 			return fmt.Sprintf("testdata/%d.response", reqID)
 		},
 	)
+	defer rec.Close()
+	var wg sync.WaitGroup
 	for {
 		select {
 		case <-ctx.Done():
@@ -64,13 +67,16 @@ func (p *redisProxy) Serve(ctx context.Context) error {
 			}
 			continue
 		}
-		go handle(src, rec)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			handle(src, rec)
+			src.Close()
+		}()
 	}
 }
 
 func handle(src io.ReadWriteCloser, dst io.ReadWriter) {
-	defer src.Close()
-
 	go func() {
 		if _, err := io.Copy(dst, src); err != nil {
 			log.Printf("write from in to out: %v", err)
