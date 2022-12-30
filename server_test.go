@@ -44,7 +44,26 @@ func TestSimple(t *testing.T) {
 			)
 			const port = 8081
 
-			srv := redisreplay.NewRedisProxy(tt.mode, port, tt.redisAddr,
+			thru := redisreplay.NewPassthrough()
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				in, err := os.Create("testdata/ingress")
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer in.Close()
+				out, err := os.Create("testdata/egress")
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer out.Close()
+				if err := thru.Serve(ctx, port, fmt.Sprintf("localhost:%d", port+1), in, out); err != nil {
+					log.Fatal(err)
+				}
+			}()
+
+			srv := redisreplay.NewRedisProxy(tt.mode, port+1, tt.redisAddr,
 				func(reqID int) string {
 					return fmt.Sprintf("testdata/%d.request", reqID)
 				},

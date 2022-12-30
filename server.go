@@ -114,7 +114,6 @@ func (p *redisProxy) Serve(ctx context.Context) error {
 	}
 }
 
-// TODO add transparency logger, that just prints out all comms
 func handle(src io.ReadWriteCloser, dst io.ReadWriter) {
 	go func() {
 		if _, err := io.Copy(dst, src); err != nil {
