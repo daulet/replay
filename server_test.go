@@ -145,6 +145,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalf("could not start resource: %s", err)
 	}
+	defer res.Close()
 	if err = pool.Retry(func() error {
 		db := redis.NewClient(&redis.Options{
 			Addr: res.GetHostPort("6379/tcp"),
