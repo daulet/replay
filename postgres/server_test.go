@@ -1,28 +1,77 @@
 package postgres_test
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/daulet/redisreplay"
 
 	_ "github.com/lib/pq"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 )
 
-var dbPort string
+var dbPort int
+
+const (
+	host     = "localhost"
+	dbname   = "testdb"
+	username = "testuser"
+	password = "testpassword"
+)
+
+func TestSimple(t *testing.T) {
+	const port = 5555
+
+	var (
+		wg          sync.WaitGroup
+		ctx, cancel = context.WithCancel(context.Background())
+	)
+
+	thru := redisreplay.NewPassthrough()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		in, err := os.Create("testdata/ingress")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer in.Close()
+		out, err := os.Create("testdata/egress")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer out.Close()
+		if err := thru.Serve(ctx, port, fmt.Sprintf("localhost:%d", dbPort), in, out); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+		username, password, host, port, dbname)
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Ping(); err != nil {
+		t.Fatal(err)
+	}
+
+	db.Close() // close connection to proxy
+	cancel()   // stop proxy
+	wg.Wait()  // wait for proxy to stop
+}
 
 // psql -h localhost -p 55198 -U testuser testdb
 // Password: testpassword
 func TestMain(m *testing.M) {
-	const (
-		dbname   = "testdb"
-		username = "testuser"
-		password = "testpassword"
-	)
 
 	pool, err := dockertest.NewPool("")
 	if err != nil {
@@ -46,9 +95,15 @@ func TestMain(m *testing.M) {
 	}
 	defer res.Close()
 
-	dbPort = res.GetHostPort("5432/tcp")
-	connStr := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable",
-		username, password, dbPort, dbname)
+	{
+		portStr := res.GetPort("5432/tcp")
+		dbPort, err = strconv.Atoi(portStr)
+		if err != nil {
+			log.Fatalf("could not parse port: %s", err)
+		}
+	}
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+		username, password, host, dbPort, dbname)
 
 	pool.MaxWait = 10 * time.Second
 	if err = pool.Retry(func() error {
