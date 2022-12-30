@@ -81,6 +81,9 @@ func TestMain(m *testing.M) {
 		Repository: "postgres",
 		Tag:        "15",
 		Env: []string{
+			fmt.Sprintf("POSTGRES_HOST_AUTH_METHOD=%s", "trust"),
+			// this is not necessary when using trust auth method
+			// however if the line above is removed this will be useful to be setup
 			fmt.Sprintf("POSTGRES_PASSWORD=%s", password),
 			fmt.Sprintf("POSTGRES_USER=%s", username),
 			fmt.Sprintf("POSTGRES_DB=%s", dbname),
