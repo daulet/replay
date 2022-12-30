@@ -30,9 +30,7 @@ func TestMain(m *testing.M) {
 	}
 	res, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository: "postgres",
-		// TODO figure out auth with v15, fails with:
-		// could not connect to postgres: pq: unknown authentication response: 10
-		Tag: "12",
+		Tag:        "15",
 		Env: []string{
 			fmt.Sprintf("POSTGRES_PASSWORD=%s", password),
 			fmt.Sprintf("POSTGRES_USER=%s", username),
