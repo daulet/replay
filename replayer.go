@@ -3,12 +3,13 @@ package redisreplay
 import (
 	"bytes"
 	"crypto/sha256"
-	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type matcher struct {
@@ -18,12 +19,21 @@ type matcher struct {
 	outMux    sync.RWMutex
 	output    *bytes.Buffer
 	responses map[[32]byte][][]byte
+
+	log *zap.Logger
 }
 
 var _ io.ReadWriteCloser = (*matcher)(nil)
 
-// TODO better, controlled logging
-func NewReplayer(reqFileFunc, respFileFunc FilenameFunc) (io.ReadWriteCloser, error) {
+type ReplayerOption func(*matcher)
+
+func ReplayerLogger(log *zap.Logger) ReplayerOption {
+	return func(m *matcher) {
+		m.log = log
+	}
+}
+
+func NewReplayer(reqFileFunc, respFileFunc FilenameFunc, opts ...ReplayerOption) (io.ReadWriteCloser, error) {
 	var (
 		reqID     int
 		err       error
@@ -54,12 +64,18 @@ func NewReplayer(reqFileFunc, respFileFunc FilenameFunc) (io.ReadWriteCloser, er
 		reqID++
 	}
 
-	return &matcher{
+	m := &matcher{
 		lineBuf:   &bytes.Buffer{},
 		reqBuf:    &bytes.Buffer{},
 		output:    &bytes.Buffer{},
 		responses: responses,
-	}, nil
+
+		log: zap.NewNop(),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m, nil
 }
 
 func (m *matcher) Read(p []byte) (int, error) {
@@ -73,7 +89,6 @@ func (m *matcher) Read(p []byte) (int, error) {
 func (m *matcher) Write(p []byte) (int, error) {
 	for _, b := range p {
 		m.lineBuf.WriteByte(b)
-		// TODO see ReadBytes(delim byte) (line []byte, err error) for replacement
 		if b == '\n' {
 			line := m.lineBuf.Bytes()
 			m.writeLine(line)
@@ -117,8 +132,7 @@ func (m *matcher) writeLine(line []byte) (n int, err error) {
 		m.outMux.Unlock()
 		return
 	}
-	fmt.Printf("no response found or previously exhaused by the same request %x\n", hash)
-	fmt.Println(string(req))
+	m.log.Info("no response found or previously exhaused by the same request", zap.ByteString("hash", hash[:]), zap.String("request", string(req)))
 	m.outMux.Lock()
 	m.output.Write([]byte("$-1\r\n")) // Null Bulk String
 	m.outMux.Unlock()

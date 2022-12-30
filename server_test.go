@@ -14,11 +14,18 @@ import (
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 var redisPort string
 
 func TestSimple(t *testing.T) {
+	logger, err := zap.NewProduction()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer logger.Sync()
+
 	tests := []struct {
 		name      string
 		mode      redisreplay.Mode
@@ -70,6 +77,7 @@ func TestSimple(t *testing.T) {
 				func(reqID int) string {
 					return fmt.Sprintf("testdata/%d.response", reqID)
 				},
+				redisreplay.ProxyLogger(logger),
 			)
 			wg.Add(1)
 			go func() {

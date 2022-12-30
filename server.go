@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"sync"
 	"syscall"
 	"time"
 
+	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 )
 
@@ -26,6 +26,16 @@ type redisProxy struct {
 	remoteAddr   string
 	reqFileFunc  FilenameFunc
 	respFileFunc FilenameFunc
+
+	log *zap.Logger
+}
+
+type ProxyOption func(*redisProxy)
+
+func ProxyLogger(log *zap.Logger) ProxyOption {
+	return func(p *redisProxy) {
+		p.log = log
+	}
 }
 
 func NewRedisProxy(
@@ -34,14 +44,21 @@ func NewRedisProxy(
 	remoteAddr string,
 	reqFileFunc FilenameFunc,
 	respFileFunc FilenameFunc,
+	opts ...ProxyOption,
 ) *redisProxy {
-	return &redisProxy{
+	p := &redisProxy{
 		mode:         mode,
 		port:         port,
 		remoteAddr:   remoteAddr,
 		reqFileFunc:  reqFileFunc,
 		respFileFunc: respFileFunc,
+
+		log: zap.NewNop(),
 	}
+	for _, opt := range opts {
+		opt(p)
+	}
+	return p
 }
 
 func (p *redisProxy) Serve(ctx context.Context) error {
@@ -80,7 +97,7 @@ func (p *redisProxy) Serve(ctx context.Context) error {
 			}
 			rw = NewRecorder(remote, p.reqFileFunc, p.respFileFunc)
 		case ModeReplay:
-			rep, err := NewReplayer(p.reqFileFunc, p.respFileFunc)
+			rep, err := NewReplayer(p.reqFileFunc, p.respFileFunc, ReplayerLogger(p.log))
 			if err != nil {
 				return err
 			}
@@ -101,26 +118,26 @@ func (p *redisProxy) Serve(ctx context.Context) error {
 		src, err := lstr.Accept()
 		if err != nil {
 			if ne, ok := err.(net.Error); ok && !ne.Timeout() {
-				log.Printf("accept error: %v", err)
+				p.log.Error("accept error", zap.Error(err))
 			}
 			continue
 		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			handle(src, rw)
+			p.handle(src, rw)
 			src.Close()
 		}()
 	}
 }
 
-func handle(src io.ReadWriteCloser, dst io.ReadWriter) {
+func (p *redisProxy) handle(src io.ReadWriteCloser, dst io.ReadWriter) {
 	go func() {
 		if _, err := io.Copy(dst, src); err != nil {
-			log.Printf("write from in to out: %v", err)
+			p.log.Error("write from in to out", zap.Error(err))
 		}
 	}()
 	if _, err := io.Copy(src, dst); err != nil {
-		log.Printf("write from out to in: %v", err)
+		p.log.Error("write from out to in", zap.Error(err))
 	}
 }

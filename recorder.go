@@ -19,7 +19,6 @@ type FilenameFunc func(reqID int) string
 func NewRecorder(conn *net.TCPConn, reqFileFunc, respFileFunc FilenameFunc) io.ReadWriteCloser {
 	writer := NewWriter(reqFileFunc, respFileFunc)
 
-	// TODO there is no reason this shouldn't work on Postgres
 	reqTee := writer.RequestWriter()
 	resTee := writer.ResponseWriter()
 
