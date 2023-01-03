@@ -219,8 +219,6 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalf("could not start resource: %s", err)
 	}
-	defer res.Close()
-
 	{
 		portStr := res.GetPort("5432/tcp")
 		dbPort, err = strconv.Atoi(portStr)
@@ -246,5 +244,6 @@ func TestMain(m *testing.M) {
 	if err := pool.Purge(res); err != nil {
 		log.Fatalf("could not purge resource: %s", err)
 	}
+	res.Close()
 	os.Exit(exitCode)
 }
