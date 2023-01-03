@@ -1,4 +1,4 @@
-package replay_test
+package redis_test
 
 import (
 	"context"
@@ -10,8 +10,9 @@ import (
 	"testing"
 
 	"github.com/daulet/replay"
+	"github.com/daulet/replay/redis"
 
-	"github.com/go-redis/redis/v8"
+	redisv8 "github.com/go-redis/redis/v8"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"github.com/stretchr/testify/assert"
@@ -47,7 +48,7 @@ func TestSimple(t *testing.T) {
 		{
 			name: "replay",
 			rwFunc: func() (io.ReadWriteCloser, error) {
-				return replay.NewReplayer(reqFunc, resFunc, replay.ReplayerLogger(logger))
+				return redis.NewReplayer(reqFunc, resFunc, redis.ReplayerLogger(logger))
 			},
 		},
 	}
@@ -93,7 +94,7 @@ func TestSimple(t *testing.T) {
 				}
 			}()
 
-			rdb := redis.NewClient(&redis.Options{
+			rdb := redisv8.NewClient(&redisv8.Options{
 				Addr:     fmt.Sprintf("localhost:%d", port),
 				Password: "", // no password set
 				DB:       0,  // use default DB
@@ -154,7 +155,7 @@ func TestMain(m *testing.M) {
 	}
 	defer res.Close()
 	if err = pool.Retry(func() error {
-		db := redis.NewClient(&redis.Options{
+		db := redisv8.NewClient(&redisv8.Options{
 			Addr: res.GetHostPort("6379/tcp"),
 		})
 		return db.Ping(ctx).Err()

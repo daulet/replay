@@ -9,6 +9,7 @@ import (
 	"net"
 
 	"github.com/daulet/replay"
+	"github.com/daulet/replay/redis"
 )
 
 // $ go run app/main.go --port 8080 --target localhost:6379
@@ -43,7 +44,7 @@ func main() {
 			panic(err)
 		}
 	} else {
-		recorder, err = replay.NewReplayer(reqFunc, resFunc)
+		recorder, err = redis.NewReplayer(reqFunc, resFunc)
 		if err != nil {
 			panic(err)
 		}

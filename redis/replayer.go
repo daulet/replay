@@ -1,4 +1,4 @@
-package replay
+package redis
 
 import (
 	"bytes"
@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/daulet/replay"
 
 	"go.uber.org/zap"
 )
@@ -33,7 +35,7 @@ func ReplayerLogger(log *zap.Logger) ReplayerOption {
 	}
 }
 
-func NewReplayer(reqFileFunc, respFileFunc FilenameFunc, opts ...ReplayerOption) (io.ReadWriteCloser, error) {
+func NewReplayer(reqFileFunc, respFileFunc replay.FilenameFunc, opts ...ReplayerOption) (io.ReadWriteCloser, error) {
 	var (
 		reqID     int
 		err       error
