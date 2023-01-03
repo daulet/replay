@@ -1,4 +1,4 @@
-module github.com/daulet/redisreplay
+module github.com/daulet/replay
 
 go 1.17
 

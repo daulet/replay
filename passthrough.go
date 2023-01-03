@@ -1,4 +1,4 @@
-package redisreplay
+package replay
 
 import (
 	"context"
@@ -52,6 +52,7 @@ func (p *passthrough) Serve(ctx context.Context, port int, remoteAddr string, in
 		src, err := lstr.Accept()
 		if err != nil {
 			if ne, ok := err.(net.Error); ok && !ne.Timeout() {
+				// TODO consistent logger
 				log.Printf("accept error: %v", err)
 			}
 			continue

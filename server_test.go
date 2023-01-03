@@ -1,4 +1,4 @@
-package redisreplay_test
+package replay_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/daulet/redisreplay"
+	"github.com/daulet/replay"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/ory/dockertest/v3"
@@ -28,17 +28,17 @@ func TestSimple(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		mode      redisreplay.Mode
+		mode      replay.Mode
 		redisAddr string
 	}{
 		{
 			name:      "record",
-			mode:      redisreplay.ModeRecord,
+			mode:      replay.ModeRecord,
 			redisAddr: redisPort,
 		},
 		{
 			name:      "replay",
-			mode:      redisreplay.ModeReplay,
+			mode:      replay.ModeReplay,
 			redisAddr: ":1", // any address that doesn't exist
 		},
 	}
@@ -51,7 +51,7 @@ func TestSimple(t *testing.T) {
 			)
 			const port = 8081
 
-			thru := redisreplay.NewPassthrough()
+			thru := replay.NewPassthrough()
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -70,14 +70,14 @@ func TestSimple(t *testing.T) {
 				}
 			}()
 
-			srv := redisreplay.NewRedisProxy(tt.mode, port+1, tt.redisAddr,
+			srv := replay.NewRedisProxy(tt.mode, port+1, tt.redisAddr,
 				func(reqID int) string {
 					return fmt.Sprintf("testdata/%d.request", reqID)
 				},
 				func(reqID int) string {
 					return fmt.Sprintf("testdata/%d.response", reqID)
 				},
-				redisreplay.ProxyLogger(logger),
+				replay.ProxyLogger(logger),
 			)
 			wg.Add(1)
 			go func() {

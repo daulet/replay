@@ -7,7 +7,7 @@ import (
 	"log"
 	"net"
 
-	"github.com/daulet/redisreplay"
+	"github.com/daulet/replay"
 )
 
 // $ go run app/main.go --port 8080 --target localhost:6379
@@ -28,11 +28,11 @@ func main() {
 	}
 	defer lstr.Close()
 
-	mode := redisreplay.ModeReplay
+	mode := replay.ModeReplay
 	if *record {
-		mode = redisreplay.ModeRecord
+		mode = replay.ModeRecord
 	}
-	srv := redisreplay.NewRedisProxy(mode, *port, *target,
+	srv := replay.NewRedisProxy(mode, *port, *target,
 		func(reqID int) string {
 			return fmt.Sprintf("testdata/%d.request", reqID)
 		},

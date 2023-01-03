@@ -1,4 +1,4 @@
-package redisreplay
+package replay
 
 import (
 	"bytes"

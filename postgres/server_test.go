@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daulet/redisreplay"
+	"github.com/daulet/replay"
 
 	_ "github.com/lib/pq"
 	"github.com/ory/dockertest/v3"
@@ -116,7 +116,7 @@ func TestSimple(t *testing.T) {
 		ctx, cancel = context.WithCancel(context.Background())
 	)
 
-	thru := redisreplay.NewPassthrough()
+	thru := replay.NewPassthrough()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -135,14 +135,14 @@ func TestSimple(t *testing.T) {
 		}
 	}()
 
-	srv := redisreplay.NewRedisProxy(redisreplay.ModeRecord, port+1, fmt.Sprintf("localhost:%d", dbPort),
+	srv := replay.NewRedisProxy(replay.ModeRecord, port+1, fmt.Sprintf("localhost:%d", dbPort),
 		func(reqID int) string {
 			return fmt.Sprintf("testdata/%d.request", reqID)
 		},
 		func(reqID int) string {
 			return fmt.Sprintf("testdata/%d.response", reqID)
 		},
-		redisreplay.ProxyLogger(logger),
+		replay.ProxyLogger(logger),
 	)
 	wg.Add(1)
 	go func() {
