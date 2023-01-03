@@ -19,6 +19,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
+	"go.uber.org/zap"
 )
 
 var dbPort int
@@ -104,6 +105,12 @@ func TestParse(t *testing.T) {
 func TestSimple(t *testing.T) {
 	const port = 5555
 
+	logger, err := zap.NewProduction()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer logger.Sync()
+
 	var (
 		wg          sync.WaitGroup
 		ctx, cancel = context.WithCancel(context.Background())
@@ -123,7 +130,24 @@ func TestSimple(t *testing.T) {
 			log.Fatal(err)
 		}
 		defer out.Close()
-		if err := thru.Serve(ctx, port, fmt.Sprintf("localhost:%d", dbPort), in, out); err != nil {
+		if err := thru.Serve(ctx, port, fmt.Sprintf("localhost:%d", port+1), in, out); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	srv := redisreplay.NewRedisProxy(redisreplay.ModeRecord, port+1, fmt.Sprintf("localhost:%d", dbPort),
+		func(reqID int) string {
+			return fmt.Sprintf("testdata/%d.request", reqID)
+		},
+		func(reqID int) string {
+			return fmt.Sprintf("testdata/%d.response", reqID)
+		},
+		redisreplay.ProxyLogger(logger),
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := srv.Serve(ctx); err != nil {
 			log.Fatal(err)
 		}
 	}()
