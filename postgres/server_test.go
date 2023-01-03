@@ -19,6 +19,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
 
@@ -161,31 +162,55 @@ func TestSimple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if err := db.Ping(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec("CREATE TABLE IF NOT EXISTS test (id int)"); err != nil {
+
+	res, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS test (id int)")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec("INSERT INTO test VALUES (1)"); err != nil {
+	affected, err := res.RowsAffected()
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec("INSERT INTO test VALUES (10)"); err != nil {
+	assert.Equal(t, int64(0), affected)
+
+	res, err = db.Exec("INSERT INTO test VALUES (1)")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if rows, err := db.QueryContext(ctx, "SELECT * FROM test"); err != nil {
+	affected, err = res.RowsAffected()
+	if err != nil {
 		t.Fatal(err)
-	} else {
-		fmt.Println("Rows:")
-		for rows.Next() {
-			var id int
-			if err := rows.Scan(&id); err != nil {
-				t.Fatal(err)
-			}
-			fmt.Println(id)
+	}
+	assert.Equal(t, int64(1), affected)
+
+	res, err = db.Exec("INSERT INTO test VALUES (10)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	affected, err = res.RowsAffected()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(1), affected)
+
+	rows, err := db.QueryContext(ctx, "SELECT * FROM test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var vals []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			t.Fatal(err)
 		}
-		rows.Close()
+		vals = append(vals, id)
 	}
+	rows.Close()
+	assert.Equal(t, []int{1, 10}, vals)
 
 	db.Close() // close connection to proxy
 	cancel()   // stop proxy
