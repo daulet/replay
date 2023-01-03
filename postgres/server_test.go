@@ -1,9 +1,12 @@
 package postgres_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strconv"
@@ -26,6 +29,77 @@ const (
 	username = "testuser"
 	password = "testpassword"
 )
+
+/*
+The first byte of a message identifies the message type,
+and the next four bytes specify the length of the rest of the message
+(this length count includes itself, but not the message-type byte).
+The remaining contents of the message are determined by the message type.
+For historical reasons, the very first message sent by the client
+(the startup message) has no initial message-type byte.
+*/
+func TestParse(t *testing.T) {
+	const request = true
+	f, err := os.Open("testdata/ingress")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	bs, err := io.ReadAll(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	i := 0
+	fmt.Printf("total len: %d\n", len(bs))
+
+	if request {
+		/*
+		 Startup phase
+		*/
+		fmt.Printf("[length]: %v\n", binary.BigEndian.Uint32(bs[i:i+4]))
+		i += 4
+		// close-complete
+		fmt.Printf("[message]: %v\n", bs[i:i+4])
+		i += 4
+		// key-value pairs
+		for bs[i] != 0 { // can't start with NUL
+			j := i
+			for j = i; bs[j] != 0; j++ {
+				// search for NUL terminated end of string
+			}
+			fmt.Printf("[string]: %s ([len=%d]%v)\n", bs[i:j], len(bs[i:j]), bs[i:j])
+			i = j + 1
+		}
+		i += 1 // skip the NUL
+	}
+
+	/*
+		Normal phase
+	*/
+	// Parse messages: https://www.postgresql.org/docs/current/protocol-message-formats.html
+	for i < len(bs) {
+		fmt.Printf("[message]: %d ('%c')\n", bs[i], bs[i])
+		if bs[i] == 'X' { // Terminate
+			break
+		}
+		i += 1
+
+		length := int(binary.BigEndian.Uint32(bs[i : i+4]))
+		fmt.Printf("[length]: %d\n", length)
+
+		// length value includes itself and NULL terminator
+		value := bs[i+4 : i+length]
+		for _, part := range bytes.Split(value, []byte{0}) {
+			if len(part) == 0 {
+				continue
+			}
+			fmt.Printf("%s ([len=%d]%v)\n", part, len(part), part)
+		}
+		i += length
+	}
+}
 
 func TestSimple(t *testing.T) {
 	const port = 5555
@@ -62,6 +136,28 @@ func TestSimple(t *testing.T) {
 	}
 	if err := db.Ping(); err != nil {
 		t.Fatal(err)
+	}
+	if _, err := db.Exec("CREATE TABLE IF NOT EXISTS test (id int)"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("INSERT INTO test VALUES (1)"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("INSERT INTO test VALUES (10)"); err != nil {
+		t.Fatal(err)
+	}
+	if rows, err := db.QueryContext(ctx, "SELECT * FROM test"); err != nil {
+		t.Fatal(err)
+	} else {
+		fmt.Println("Rows:")
+		for rows.Next() {
+			var id int
+			if err := rows.Scan(&id); err != nil {
+				t.Fatal(err)
+			}
+			fmt.Println(id)
+		}
+		rows.Close()
 	}
 
 	db.Close() // close connection to proxy
