@@ -177,7 +177,7 @@ func TestSimple(t *testing.T) {
 	}
 	assert.Equal(t, int64(0), affected)
 
-	res, err = db.Exec("INSERT INTO test VALUES (1)")
+	res, err = db.ExecContext(ctx, "INSERT INTO test VALUES (1)")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestSimple(t *testing.T) {
 	}
 	assert.Equal(t, int64(1), affected)
 
-	res, err = db.Exec("INSERT INTO test VALUES (10)")
+	res, err = db.ExecContext(ctx, "INSERT INTO test VALUES (10)")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,6 +211,17 @@ func TestSimple(t *testing.T) {
 	}
 	rows.Close()
 	assert.Equal(t, []int{1, 10}, vals)
+
+	// reset state so tests can be run multiple times
+	res, err = db.ExecContext(ctx, "DROP TABLE test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	affected, err = res.RowsAffected()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(0), affected)
 
 	db.Close() // close connection to proxy
 	cancel()   // stop proxy
