@@ -20,38 +20,29 @@ const (
 	ModeReplay
 )
 
-type redisProxy struct {
-	mode         Mode
-	port         int
-	remoteAddr   string
-	reqFileFunc  FilenameFunc
-	respFileFunc FilenameFunc
+type proxy struct {
+	port int
+	rw   io.ReadWriteCloser
 
 	log *zap.Logger
 }
 
-type ProxyOption func(*redisProxy)
+type ProxyOption func(*proxy)
 
 func ProxyLogger(log *zap.Logger) ProxyOption {
-	return func(p *redisProxy) {
+	return func(p *proxy) {
 		p.log = log
 	}
 }
 
-func NewRedisProxy(
-	mode Mode,
+func NewProxy(
 	port int,
-	remoteAddr string,
-	reqFileFunc FilenameFunc,
-	respFileFunc FilenameFunc,
+	readWriter io.ReadWriteCloser,
 	opts ...ProxyOption,
-) *redisProxy {
-	p := &redisProxy{
-		mode:         mode,
-		port:         port,
-		remoteAddr:   remoteAddr,
-		reqFileFunc:  reqFileFunc,
-		respFileFunc: respFileFunc,
+) *proxy {
+	p := &proxy{
+		port: port,
+		rw:   readWriter,
 
 		log: zap.NewNop(),
 	}
@@ -61,7 +52,7 @@ func NewRedisProxy(
 	return p
 }
 
-func (p *redisProxy) Serve(ctx context.Context) error {
+func (p *proxy) Serve(ctx context.Context) error {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
@@ -82,32 +73,6 @@ func (p *redisProxy) Serve(ctx context.Context) error {
 		lstr = l.(*net.TCPListener)
 	}
 
-	var rw io.ReadWriteCloser
-	{
-		switch p.mode {
-		case ModeRecord:
-			var remote *net.TCPConn
-			{
-				conn, err := net.Dial("tcp", p.remoteAddr)
-				if err != nil {
-					return err
-				}
-				defer conn.Close()
-				remote = conn.(*net.TCPConn)
-			}
-			rw = NewRecorder(remote, p.reqFileFunc, p.respFileFunc)
-		case ModeReplay:
-			rep, err := NewReplayer(p.reqFileFunc, p.respFileFunc, ReplayerLogger(p.log))
-			if err != nil {
-				return err
-			}
-			rw = rep
-		default:
-			return fmt.Errorf("unknown mode: %d", p.mode)
-		}
-	}
-	defer rw.Close()
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -125,13 +90,13 @@ func (p *redisProxy) Serve(ctx context.Context) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			p.handle(src, rw)
+			p.handle(src, p.rw)
 			src.Close()
 		}()
 	}
 }
 
-func (p *redisProxy) handle(src io.ReadWriteCloser, dst io.ReadWriter) {
+func (p *proxy) handle(src io.ReadWriteCloser, dst io.ReadWriter) {
 	go func() {
 		if _, err := io.Copy(dst, src); err != nil {
 			p.log.Error("write from in to out", zap.Error(err))

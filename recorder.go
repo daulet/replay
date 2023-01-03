@@ -16,20 +16,23 @@ type Recorder struct {
 
 type FilenameFunc func(reqID int) string
 
-func NewRecorder(conn *net.TCPConn, reqFileFunc, respFileFunc FilenameFunc) io.ReadWriteCloser {
+func NewRecorder(addr string, reqFileFunc, respFileFunc FilenameFunc) (io.ReadWriteCloser, error) {
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
 	writer := NewWriter(reqFileFunc, respFileFunc)
-
 	reqTee := writer.RequestWriter()
 	resTee := writer.ResponseWriter()
 
 	return &Recorder{
-		TCPConn: *conn,
+		TCPConn: *conn.(*net.TCPConn),
 		writer:  writer,
 		closed:  make(chan struct{}),
 
 		reqTee: reqTee,
 		resTee: resTee,
-	}
+	}, nil
 }
 
 var _ net.Conn = (*Recorder)(nil)

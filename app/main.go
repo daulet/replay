@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 
@@ -19,6 +20,13 @@ func main() {
 		record = flag.Bool("record", false, "record traffic")
 		port   = flag.Int("port", 0, "port to listen on")
 		target = flag.String("target", "", "target host:port")
+
+		reqFunc = func(reqID int) string {
+			return fmt.Sprintf("testdata/%d.request", reqID)
+		}
+		resFunc = func(reqID int) string {
+			return fmt.Sprintf("testdata/%d.response", reqID)
+		}
 	)
 	flag.Parse()
 
@@ -28,18 +36,20 @@ func main() {
 	}
 	defer lstr.Close()
 
-	mode := replay.ModeReplay
+	var recorder io.ReadWriteCloser
 	if *record {
-		mode = replay.ModeRecord
+		recorder, err = replay.NewRecorder(*target, reqFunc, resFunc)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		recorder, err = replay.NewReplayer(reqFunc, resFunc)
+		if err != nil {
+			panic(err)
+		}
 	}
-	srv := replay.NewRedisProxy(mode, *port, *target,
-		func(reqID int) string {
-			return fmt.Sprintf("testdata/%d.request", reqID)
-		},
-		func(reqID int) string {
-			return fmt.Sprintf("testdata/%d.response", reqID)
-		},
-	)
+	defer recorder.Close()
+	srv := replay.NewProxy(*port, recorder)
 	if err := srv.Serve(ctx); err != nil {
 		log.Fatal(err)
 	}

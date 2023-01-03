@@ -3,6 +3,7 @@ package replay_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"sync"
@@ -26,20 +27,28 @@ func TestSimple(t *testing.T) {
 	}
 	defer logger.Sync()
 
+	reqFunc := func(reqID int) string {
+		return fmt.Sprintf("testdata/%d.request", reqID)
+	}
+	resFunc := func(reqID int) string {
+		return fmt.Sprintf("testdata/%d.response", reqID)
+	}
+
 	tests := []struct {
-		name      string
-		mode      replay.Mode
-		redisAddr string
+		name   string
+		rwFunc func() (io.ReadWriteCloser, error)
 	}{
 		{
-			name:      "record",
-			mode:      replay.ModeRecord,
-			redisAddr: redisPort,
+			name: "record",
+			rwFunc: func() (io.ReadWriteCloser, error) {
+				return replay.NewRecorder(redisPort, reqFunc, resFunc)
+			},
 		},
 		{
-			name:      "replay",
-			mode:      replay.ModeReplay,
-			redisAddr: ":1", // any address that doesn't exist
+			name: "replay",
+			rwFunc: func() (io.ReadWriteCloser, error) {
+				return replay.NewReplayer(reqFunc, resFunc, replay.ReplayerLogger(logger))
+			},
 		},
 	}
 
@@ -50,6 +59,11 @@ func TestSimple(t *testing.T) {
 				ctx, cancel = context.WithCancel(context.Background())
 			)
 			const port = 8081
+
+			rw, err := tt.rwFunc()
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			thru := replay.NewPassthrough()
 			wg.Add(1)
@@ -70,15 +84,7 @@ func TestSimple(t *testing.T) {
 				}
 			}()
 
-			srv := replay.NewRedisProxy(tt.mode, port+1, tt.redisAddr,
-				func(reqID int) string {
-					return fmt.Sprintf("testdata/%d.request", reqID)
-				},
-				func(reqID int) string {
-					return fmt.Sprintf("testdata/%d.response", reqID)
-				},
-				replay.ProxyLogger(logger),
-			)
+			srv := replay.NewProxy(port+1, rw, replay.ProxyLogger(logger))
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -121,6 +127,7 @@ func TestSimple(t *testing.T) {
 			if err := rdb.FlushDB(ctx).Err(); err != nil {
 				t.Fatal(err)
 			}
+			rw.Close()  // close connection to read/writer
 			rdb.Close() // close connection to proxy
 			cancel()    // stop proxy
 			wg.Wait()   // wait for proxy to stop

@@ -135,15 +135,18 @@ func TestSimple(t *testing.T) {
 		}
 	}()
 
-	srv := replay.NewRedisProxy(replay.ModeRecord, port+1, fmt.Sprintf("localhost:%d", dbPort),
+	recorder, err := replay.NewRecorder(fmt.Sprintf("localhost:%d", dbPort),
 		func(reqID int) string {
 			return fmt.Sprintf("testdata/%d.request", reqID)
 		},
 		func(reqID int) string {
 			return fmt.Sprintf("testdata/%d.response", reqID)
 		},
-		replay.ProxyLogger(logger),
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := replay.NewProxy(port+1, recorder, replay.ProxyLogger(logger))
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
