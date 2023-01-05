@@ -73,14 +73,9 @@ func (p *proxy) Serve(ctx context.Context) error {
 		lstr = l.(*net.TCPListener)
 	}
 
-	var conns []net.Conn
 	for {
 		select {
 		case <-ctx.Done():
-			p.rw.Close()
-			for _, conn := range conns {
-				conn.Close()
-			}
 			return nil
 		default:
 		}
@@ -92,11 +87,11 @@ func (p *proxy) Serve(ctx context.Context) error {
 			}
 			continue
 		}
-		conns = append(conns, src)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			p.handle(src, p.rw)
+			src.Close()
 		}()
 	}
 }
