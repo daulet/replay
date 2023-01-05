@@ -109,6 +109,7 @@ func TestParse(t *testing.T) {
 
 		// length value includes itself and NULL terminator
 		value := bs[i+4 : i+length]
+		fmt.Printf("%s ([len=%d]%v)\n", value, len(value), value)
 		for _, part := range bytes.Split(value, []byte{0}) {
 			if len(part) == 0 {
 				continue
