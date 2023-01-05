@@ -258,9 +258,7 @@ func TestPostgres(t *testing.T) {
 
 			db.Close() // close connection to proxy
 			cancel()   // stop proxy
-			// TODO close rw
-			// rw.Close() // close connection to read/writer
-			wg.Wait() // wait for proxy to stop
+			wg.Wait()  // wait for proxy to stop
 		})
 	}
 }

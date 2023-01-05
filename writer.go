@@ -15,7 +15,7 @@ func (w *funcWriter) Write(p []byte) (int, error) {
 	return w.write(p)
 }
 
-type writer struct {
+type Writer struct {
 	reqFilenameFunc  FilenameFunc
 	respFilenameFunc FilenameFunc
 
@@ -24,33 +24,33 @@ type writer struct {
 	respWriter io.WriteCloser
 }
 
-func NewWriter(reqFilenameFunc, respFilenameFunc FilenameFunc) *writer {
-	return &writer{
+func NewWriter(reqFilenameFunc, respFilenameFunc FilenameFunc) *Writer {
+	return &Writer{
 		reqFilenameFunc:  reqFilenameFunc,
 		respFilenameFunc: respFilenameFunc,
 	}
 }
 
-func (w *writer) RequestWriter() io.Writer {
+func (w *Writer) RequestWriter() io.Writer {
 	return &funcWriter{
 		write: w.writeRequest,
 	}
 }
 
-func (w *writer) ResponseWriter() io.Writer {
+func (w *Writer) ResponseWriter() io.Writer {
 	return &funcWriter{
 		write: w.writeResponse,
 	}
 }
 
-func (w *writer) Close() error {
+func (w *Writer) Close() error {
 	if w.respWriter != nil {
 		return w.respWriter.Close()
 	}
 	return nil
 }
 
-func (w *writer) writeRequest(p []byte) (int, error) {
+func (w *Writer) writeRequest(p []byte) (int, error) {
 	if w.reqWriter == nil {
 		if w.respWriter != nil {
 			w.respWriter.Close()
@@ -68,7 +68,7 @@ func (w *writer) writeRequest(p []byte) (int, error) {
 	return w.reqWriter.Write(p)
 }
 
-func (w *writer) writeResponse(p []byte) (int, error) {
+func (w *Writer) writeResponse(p []byte) (int, error) {
 	if w.respWriter == nil {
 		if w.reqWriter != nil {
 			w.reqWriter.Close()

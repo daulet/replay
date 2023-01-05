@@ -6,10 +6,11 @@ import (
 )
 
 type Recorder struct {
+	// TODO stop embedding
 	net.TCPConn
-	writer *writer
 	closed chan struct{}
 
+	writer *Writer
 	reqTee io.Writer
 	resTee io.Writer
 }
@@ -27,9 +28,9 @@ func NewRecorder(addr string, reqFileFunc, respFileFunc FilenameFunc) (io.ReadWr
 
 	return &Recorder{
 		TCPConn: *conn.(*net.TCPConn),
-		writer:  writer,
 		closed:  make(chan struct{}),
 
+		writer: writer,
 		reqTee: reqTee,
 		resTee: resTee,
 	}, nil

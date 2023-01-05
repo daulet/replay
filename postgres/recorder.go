@@ -20,12 +20,14 @@ var (
 type recorder struct {
 	conn io.ReadWriteCloser
 
-	chIW chan<- byte // Ingress write, before chIR
-	chIR <-chan byte // Ingress read, after chIW
-	chEW chan<- byte // Egress write, before chER
-	chER <-chan byte // Egress read, after chEW
-	wg   *sync.WaitGroup
+	closed chan struct{}
+	chIW   chan<- byte // Ingress write, before chIR
+	chIR   <-chan byte // Ingress read, after chIW
+	chEW   chan<- byte // Egress write, before chER
+	chER   <-chan byte // Egress read, after chEW
+	wg     *sync.WaitGroup
 
+	writer *replay.Writer
 	reqTee io.Writer
 	resTee io.Writer
 }
@@ -57,6 +59,7 @@ func NewRecorder(addr string, reqFileFunc, respFileFunc replay.FilenameFunc) (io
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		defer close(chER)
 		parseMessages(chEW, chER)
 	}()
 
@@ -77,7 +80,6 @@ func NewRecorder(addr string, reqFileFunc, respFileFunc replay.FilenameFunc) (io
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		defer close(chEW)
 		for b := range chER {
 			resTee.Write([]byte{b})
 		}
@@ -86,12 +88,14 @@ func NewRecorder(addr string, reqFileFunc, respFileFunc replay.FilenameFunc) (io
 	return &recorder{
 		conn: conn,
 
-		chIW: chIW,
-		chIR: chIR,
-		chEW: chEW,
-		chER: chER,
-		wg:   wg,
+		closed: make(chan struct{}),
+		chIW:   chIW,
+		chIR:   chIR,
+		chEW:   chEW,
+		chER:   chER,
+		wg:     wg,
 
+		writer: writer,
 		reqTee: reqTee,
 		resTee: resTee,
 	}, nil
@@ -174,26 +178,36 @@ func writeN(ch chan<- byte, bs []byte) {
 }
 
 func (r *recorder) Read(p []byte) (int, error) {
+	select {
+	case <-r.closed:
+		return 0, io.EOF
+	default:
+	}
 	n, err := r.conn.Read(p)
 	p = p[:n]
 	for _, b := range p {
 		r.chEW <- b
 	}
-	// TODO how do we handle EOF?
 	return n, err
 }
 
 func (r *recorder) Write(p []byte) (int, error) {
+	select {
+	case <-r.closed:
+		return 0, io.EOF
+	default:
+	}
 	for _, b := range p {
 		r.chIW <- b
 	}
-	// TODO how do we handle EOF?
 	return len(p), nil
 }
 
 func (r *recorder) Close() error {
+	close(r.closed)
 	close(r.chIW)
 	close(r.chEW)
 	r.wg.Wait()
+	r.writer.Close()
 	return r.conn.Close()
 }
