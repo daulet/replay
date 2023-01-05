@@ -120,7 +120,7 @@ func TestParse(t *testing.T) {
 	}
 }
 
-func TestSimple(t *testing.T) {
+func TestPostgres(t *testing.T) {
 	const port = 5555
 
 	logger, err := zap.NewProduction()
@@ -129,121 +129,140 @@ func TestSimple(t *testing.T) {
 	}
 	defer logger.Sync()
 
-	var (
-		wg          sync.WaitGroup
-		ctx, cancel = context.WithCancel(context.Background())
-	)
+	reqFunc := func(reqID int) string {
+		return fmt.Sprintf("testdata/%d.request", reqID)
+	}
+	resFunc := func(reqID int) string {
+		return fmt.Sprintf("testdata/%d.response", reqID)
+	}
 
-	thru := replay.NewPassthrough()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		// TODO these outputs are not stable
-		in, err := os.Create("testdata/ingress")
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer in.Close()
-		out, err := os.Create("testdata/egress")
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer out.Close()
-		if err := thru.Serve(ctx, port, fmt.Sprintf("localhost:%d", port+1), in, out); err != nil {
-			log.Fatal(err)
-		}
-	}()
-
-	recorder, err := postgres.NewRecorder(fmt.Sprintf("localhost:%d", dbPort),
-		func(reqID int) string {
-			return fmt.Sprintf("testdata/%d.request", reqID)
+	tests := []struct {
+		name   string
+		rwFunc func() (io.ReadWriteCloser, error)
+	}{
+		{
+			name: "record",
+			rwFunc: func() (io.ReadWriteCloser, error) {
+				return postgres.NewRecorder(fmt.Sprintf("localhost:%d", dbPort), reqFunc, resFunc)
+			},
 		},
-		func(reqID int) string {
-			return fmt.Sprintf("testdata/%d.response", reqID)
-		},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	srv := replay.NewProxy(port+1, recorder, replay.ProxyLogger(logger))
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := srv.Serve(ctx); err != nil {
-			log.Fatal(err)
-		}
-	}()
-
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
-		username, password, host, port, dbname)
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		t.Fatal(err)
 	}
 
-	if err := db.Ping(); err != nil {
-		t.Fatal(err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var (
+				wg          sync.WaitGroup
+				ctx, cancel = context.WithCancel(context.Background())
+			)
 
-	res, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS test (id int)")
-	if err != nil {
-		t.Fatal(err)
-	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, int64(0), affected)
+			thru := replay.NewPassthrough()
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				// TODO these outputs are not stable
+				in, err := os.Create("testdata/ingress")
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer in.Close()
+				out, err := os.Create("testdata/egress")
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer out.Close()
+				if err := thru.Serve(ctx, port, fmt.Sprintf("localhost:%d", port+1), in, out); err != nil {
+					log.Fatal(err)
+				}
+			}()
 
-	res, err = db.ExecContext(ctx, "INSERT INTO test VALUES (1)")
-	if err != nil {
-		t.Fatal(err)
-	}
-	affected, err = res.RowsAffected()
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, int64(1), affected)
+			rw, err := tt.rwFunc()
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	res, err = db.ExecContext(ctx, "INSERT INTO test VALUES (10)")
-	if err != nil {
-		t.Fatal(err)
-	}
-	affected, err = res.RowsAffected()
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, int64(1), affected)
+			srv := replay.NewProxy(port+1, rw, replay.ProxyLogger(logger))
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if err := srv.Serve(ctx); err != nil {
+					log.Fatal(err)
+				}
+			}()
 
-	rows, err := db.QueryContext(ctx, "SELECT * FROM test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var vals []int
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			t.Fatal(err)
-		}
-		vals = append(vals, id)
-	}
-	rows.Close()
-	assert.Equal(t, []int{1, 10}, vals)
+			connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+				username, password, host, port, dbname)
+			db, err := sql.Open("postgres", connStr)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	// reset state so tests can be run multiple times
-	res, err = db.ExecContext(ctx, "DROP TABLE test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	affected, err = res.RowsAffected()
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, int64(0), affected)
+			if err := db.Ping(); err != nil {
+				t.Fatal(err)
+			}
 
-	db.Close() // close connection to proxy
-	cancel()   // stop proxy
-	wg.Wait()  // wait for proxy to stop
+			res, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS test (id int)")
+			if err != nil {
+				t.Fatal(err)
+			}
+			affected, err := res.RowsAffected()
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, int64(0), affected)
+
+			res, err = db.ExecContext(ctx, "INSERT INTO test VALUES (1)")
+			if err != nil {
+				t.Fatal(err)
+			}
+			affected, err = res.RowsAffected()
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, int64(1), affected)
+
+			res, err = db.ExecContext(ctx, "INSERT INTO test VALUES (10)")
+			if err != nil {
+				t.Fatal(err)
+			}
+			affected, err = res.RowsAffected()
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, int64(1), affected)
+
+			rows, err := db.QueryContext(ctx, "SELECT * FROM test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var vals []int
+			for rows.Next() {
+				var id int
+				if err := rows.Scan(&id); err != nil {
+					t.Fatal(err)
+				}
+				vals = append(vals, id)
+			}
+			rows.Close()
+			assert.Equal(t, []int{1, 10}, vals)
+
+			// reset state so tests can be run multiple times
+			res, err = db.ExecContext(ctx, "DROP TABLE test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			affected, err = res.RowsAffected()
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, int64(0), affected)
+
+			db.Close() // close connection to proxy
+			cancel()   // stop proxy
+			// TODO close rw
+			// rw.Close() // close connection to read/writer
+			wg.Wait() // wait for proxy to stop
+		})
+	}
 }
 
 // psql -h localhost -p 55198 -U testuser testdb

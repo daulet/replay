@@ -21,7 +21,9 @@ import (
 
 var redisPort string
 
-func TestSimple(t *testing.T) {
+func TestRedis(t *testing.T) {
+	const port = 8081
+
 	logger, err := zap.NewProduction()
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +61,6 @@ func TestSimple(t *testing.T) {
 				wg          sync.WaitGroup
 				ctx, cancel = context.WithCancel(context.Background())
 			)
-			const port = 8081
 
 			rw, err := tt.rwFunc()
 			if err != nil {
