@@ -15,9 +15,12 @@ import (
 )
 
 type matcher struct {
-	reqLen    int
-	lineBuf   *bytes.Buffer
-	reqBuf    *bytes.Buffer
+	reqLen  int
+	lineBuf *bytes.Buffer
+	reqBuf  *bytes.Buffer
+
+	// lock arount 'output' is necessary since
+	// both read&write will access it
 	outMux    sync.RWMutex
 	output    *bytes.Buffer
 	responses map[[32]byte][][]byte
