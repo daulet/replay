@@ -64,5 +64,6 @@ func (r *Recorder) Write(p []byte) (int, error) {
 
 func (r *Recorder) Close() error {
 	close(r.closed)
+	r.writer.Close()
 	return r.TCPConn.Close()
 }
