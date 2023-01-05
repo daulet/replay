@@ -9,12 +9,14 @@ import (
 	"io"
 	"log"
 	"os"
+	"sort"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/daulet/replay"
+	"github.com/daulet/replay/postgres"
 
 	_ "github.com/lib/pq"
 	"github.com/ory/dockertest/v3"
@@ -66,15 +68,29 @@ func TestParse(t *testing.T) {
 		fmt.Printf("[message]: %v\n", bs[i:i+4])
 		i += 4
 		// key-value pairs
+		m := make(map[string]string)
 		for bs[i] != 0 { // can't start with NUL
-			j := i
-			for j = i; bs[j] != 0; j++ {
-				// search for NUL terminated end of string
+			var ss []string
+			for k := 0; k < 2; k++ {
+				j := i
+				for j = i; bs[j] != 0; j++ {
+					// search for NUL terminated end of string
+				}
+				ss = append(ss, string(bs[i:j]))
+				i = j + 1
 			}
-			fmt.Printf("[string]: %s ([len=%d]%v)\n", bs[i:j], len(bs[i:j]), bs[i:j])
-			i = j + 1
+			m[ss[0]] = ss[1]
 		}
 		i += 1 // skip the NUL
+
+		var keys []string
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			fmt.Printf("%s => %s\n", k, m[k])
+		}
 	}
 
 	/*
@@ -121,6 +137,7 @@ func TestSimple(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		// TODO these outputs are not stable
 		in, err := os.Create("testdata/ingress")
 		if err != nil {
 			log.Fatal(err)
@@ -136,7 +153,7 @@ func TestSimple(t *testing.T) {
 		}
 	}()
 
-	recorder, err := replay.NewRecorder(fmt.Sprintf("localhost:%d", dbPort),
+	recorder, err := postgres.NewRecorder(fmt.Sprintf("localhost:%d", dbPort),
 		func(reqID int) string {
 			return fmt.Sprintf("testdata/%d.request", reqID)
 		},
