@@ -6,9 +6,7 @@ import (
 )
 
 type Recorder struct {
-	// TODO stop embedding
-	net.TCPConn
-	closed chan struct{}
+	conn net.Conn
 
 	writer *Writer
 	reqTee io.Writer
@@ -27,46 +25,34 @@ func NewRecorder(addr string, reqFileFunc, respFileFunc FilenameFunc) (io.ReadWr
 	resTee := writer.ResponseWriter()
 
 	return &Recorder{
-		TCPConn: *conn.(*net.TCPConn),
-		writer:  writer,
-		closed:  make(chan struct{}),
+		conn: conn,
 
+		writer: writer,
 		reqTee: reqTee,
 		resTee: resTee,
 	}, nil
 }
 
-var _ net.Conn = (*Recorder)(nil)
+var _ io.ReadWriteCloser = (*Recorder)(nil)
 
 func (r *Recorder) Read(p []byte) (int, error) {
-	select {
-	case <-r.closed:
-		return 0, io.EOF
-	default:
-	}
-	n, err := r.TCPConn.Read(p)
+	n, err := r.conn.Read(p)
 	r.resTee.Write(p[:n])
 	return n, err
 }
 
 func (r *Recorder) ReadFrom(rdr io.Reader) (int64, error) {
-	return io.Copy(&r.TCPConn, io.TeeReader(rdr, r.reqTee))
+	return io.Copy(r.conn, io.TeeReader(rdr, r.reqTee))
 }
 
 func (r *Recorder) Write(p []byte) (int, error) {
-	select {
-	case <-r.closed:
-		return 0, io.EOF
-	default:
-	}
-	r.reqTee.Write(p)
-	return r.TCPConn.Write(p)
+	n, err := r.conn.Write(p)
+	r.reqTee.Write(p[:n])
+	return n, err
 }
 
 func (r *Recorder) Close() error {
-	r.TCPConn.Close()
-	close(r.closed)
-	// TODO perhaps writer should be closed when TCPConn is closed
+	r.conn.Close()
 	r.writer.Close()
 	return nil
 }
