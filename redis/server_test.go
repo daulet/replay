@@ -67,26 +67,7 @@ func TestRedis(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			thru := replay.NewPassthrough()
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				in, err := os.Create("testdata/ingress")
-				if err != nil {
-					log.Fatal(err)
-				}
-				defer in.Close()
-				out, err := os.Create("testdata/egress")
-				if err != nil {
-					log.Fatal(err)
-				}
-				defer out.Close()
-				if err := thru.Serve(ctx, port, fmt.Sprintf("localhost:%d", port+1), in, out); err != nil {
-					log.Fatal(err)
-				}
-			}()
-
-			srv := replay.NewProxy(port+1, rw, replay.ProxyLogger(logger))
+			srv := replay.NewProxy(port, rw, replay.ProxyLogger(logger))
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
