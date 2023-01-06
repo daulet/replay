@@ -110,6 +110,7 @@ func (m *matcher) Close() error {
 // Redis request format
 // first line contains *<number of parameters>
 // what follow is 2 * <number of parameters> lines
+// More on data types: https://github.com/go-redis/redis/blob/master/internal/proto/reader.go#L16-L32
 func (m *matcher) writeLine(line []byte) (n int, err error) {
 	n, err = m.reqBuf.Write(line)
 	if m.reqLen == 0 {
