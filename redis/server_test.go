@@ -94,6 +94,7 @@ func TestRedis(t *testing.T) {
 					log.Fatal(err)
 				}
 			}()
+			<-srv.Ready()
 
 			rdb := redisv8.NewClient(&redisv8.Options{
 				Addr:     fmt.Sprintf("localhost:%d", port),

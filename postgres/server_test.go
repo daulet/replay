@@ -170,6 +170,7 @@ func TestPostgres(t *testing.T) {
 					log.Fatal(err)
 				}
 			}()
+			<-srv.Ready()
 
 			connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 				username, password, host, port, dbname)

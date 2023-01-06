@@ -21,8 +21,9 @@ const (
 )
 
 type proxy struct {
-	port int
-	rw   io.ReadWriteCloser
+	ready chan struct{}
+	port  int
+	rw    io.ReadWriteCloser
 
 	log *zap.Logger
 }
@@ -41,8 +42,9 @@ func NewProxy(
 	opts ...ProxyOption,
 ) *proxy {
 	p := &proxy{
-		port: port,
-		rw:   readWriter,
+		ready: make(chan struct{}),
+		port:  port,
+		rw:    readWriter,
 
 		log: zap.NewNop(),
 	}
@@ -50,6 +52,10 @@ func NewProxy(
 		opt(p)
 	}
 	return p
+}
+
+func (p *proxy) Ready() <-chan struct{} {
+	return p.ready
 }
 
 func (p *proxy) Serve(ctx context.Context) error {
@@ -72,6 +78,8 @@ func (p *proxy) Serve(ctx context.Context) error {
 		defer l.Close()
 		lstr = l.(*net.TCPListener)
 	}
+
+	close(p.ready)
 
 	for {
 		select {
