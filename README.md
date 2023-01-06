@@ -6,8 +6,12 @@ Record & Replay traffic - alternative to dependency injection.
 
 * ~~Support Redis~~
 * ~~Support Postgres~~
-* Support HTTP
-* Support gRPC
+* Support generic TCP, timeout based request detection on replay;
+* Ready to deploy containers for record/replay;
+* Support HTTP;
+* Add execution layer for running tests;
+* Support gRPC;
+* Examples with popular APIs like S3 or Stripe;
 * Address race issues after eliminiating potential problems:
     * Do NOT reuse containers between test runs;
     * Do NOT write to disk from writer, just compare to golden files;
