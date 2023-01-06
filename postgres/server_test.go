@@ -142,6 +142,7 @@ func TestPostgres(t *testing.T) {
 		rwFunc func() (io.ReadWriteCloser, error)
 	}{
 		{
+			// TODO don't override files, compare them instead
 			name: "record",
 			rwFunc: func() (io.ReadWriteCloser, error) {
 				return postgres.NewRecorder(fmt.Sprintf("localhost:%d", dbPort), reqFunc, resFunc)
@@ -156,32 +157,12 @@ func TestPostgres(t *testing.T) {
 				ctx, cancel = context.WithCancel(context.Background())
 			)
 
-			thru := replay.NewPassthrough()
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				// TODO these outputs are not stable
-				in, err := os.Create("testdata/ingress")
-				if err != nil {
-					log.Fatal(err)
-				}
-				defer in.Close()
-				out, err := os.Create("testdata/egress")
-				if err != nil {
-					log.Fatal(err)
-				}
-				defer out.Close()
-				if err := thru.Serve(ctx, port, fmt.Sprintf("localhost:%d", port+1), in, out); err != nil {
-					log.Fatal(err)
-				}
-			}()
-
 			rw, err := tt.rwFunc()
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			srv := replay.NewProxy(port+1, rw, replay.ProxyLogger(logger))
+			srv := replay.NewProxy(port, rw, replay.ProxyLogger(logger))
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -258,10 +239,10 @@ func TestPostgres(t *testing.T) {
 			assert.Equal(t, int64(0), affected)
 
 			db.Close() // close connection to proxy
-			cancel()   // stop proxy
-			// TODO close rw
-			// rw.Close() // close connection to read/writer
-			wg.Wait() // wait for proxy to stop
+			cancel()   // signal proxy to stop
+			wg.Wait()  // wait for proxy to stop
+			// TODO order inconsistent with redis/server_test.go
+			rw.Close() // close connection to read/writer
 		})
 	}
 }

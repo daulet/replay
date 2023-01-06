@@ -6,10 +6,11 @@ import (
 )
 
 type Recorder struct {
+	// TODO stop embedding
 	net.TCPConn
-	writer *writer
 	closed chan struct{}
 
+	writer *Writer
 	reqTee io.Writer
 	resTee io.Writer
 }
@@ -63,7 +64,9 @@ func (r *Recorder) Write(p []byte) (int, error) {
 }
 
 func (r *Recorder) Close() error {
+	r.TCPConn.Close()
 	close(r.closed)
+	// TODO perhaps writer should be closed when TCPConn is closed
 	r.writer.Close()
-	return r.TCPConn.Close()
+	return nil
 }

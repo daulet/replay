@@ -129,9 +129,10 @@ func TestRedis(t *testing.T) {
 			if err := rdb.FlushDB(ctx).Err(); err != nil {
 				t.Fatal(err)
 			}
+			// TODO this should probably be the last step
 			rw.Close()  // close connection to read/writer
 			rdb.Close() // close connection to proxy
-			cancel()    // stop proxy
+			cancel()    // signal proxy to stop
 			wg.Wait()   // wait for proxy to stop
 		})
 	}

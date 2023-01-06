@@ -26,6 +26,7 @@ type recorder struct {
 	chER <-chan byte // Egress read, after chEW
 	wg   *sync.WaitGroup
 
+	writer *replay.Writer
 	reqTee io.Writer
 	resTee io.Writer
 }
@@ -57,6 +58,7 @@ func NewRecorder(addr string, reqFileFunc, respFileFunc replay.FilenameFunc) (io
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		defer close(chER)
 		parseMessages(chEW, chER)
 	}()
 
@@ -77,7 +79,6 @@ func NewRecorder(addr string, reqFileFunc, respFileFunc replay.FilenameFunc) (io
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		defer close(chEW)
 		for b := range chER {
 			resTee.Write([]byte{b})
 		}
@@ -92,6 +93,7 @@ func NewRecorder(addr string, reqFileFunc, respFileFunc replay.FilenameFunc) (io
 		chER: chER,
 		wg:   wg,
 
+		writer: writer,
 		reqTee: reqTee,
 		resTee: resTee,
 	}, nil
@@ -175,11 +177,13 @@ func writeN(ch chan<- byte, bs []byte) {
 
 func (r *recorder) Read(p []byte) (int, error) {
 	n, err := r.conn.Read(p)
+	if err != nil {
+		return n, err
+	}
 	p = p[:n]
 	for _, b := range p {
 		r.chEW <- b
 	}
-	// TODO how do we handle EOF?
 	return n, err
 }
 
@@ -192,8 +196,11 @@ func (r *recorder) Write(p []byte) (int, error) {
 }
 
 func (r *recorder) Close() error {
+	r.conn.Close()
+	// TODO these should be closed due to EOF on conns, not out of the loop;
 	close(r.chIW)
 	close(r.chEW)
 	r.wg.Wait()
-	return r.conn.Close()
+	r.writer.Close()
+	return nil
 }
