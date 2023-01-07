@@ -1,0 +1,25 @@
+version: "3.6"
+
+services:
+  replay:
+    build:
+      context: ../..
+      dockerfile: app/redis/Dockerfile
+    restart: always
+    volumes:
+      - ./testdata:/testdata
+    ports:
+      - "6379:6379"
+    networks:
+      - replay
+  redis:
+    image: redis:6-alpine
+    restart: always
+    expose:
+      - "6379"
+    networks:
+      - replay
+
+networks:
+  replay:
+    name: replay

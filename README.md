@@ -1,6 +1,15 @@
 # Replay
 Record & Replay traffic - alternative to dependency injection.
 
+# Language agnostic
+
+```
+cd app/redis
+docker compose up -d
+```
+
+Now play with `redis-cli` or point your app to `:6379`.
+
 
 # TODO
 

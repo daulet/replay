@@ -3,6 +3,7 @@ package replay
 import (
 	"io"
 	"os"
+	"path"
 	"sync"
 )
 
@@ -61,7 +62,11 @@ func (w *Writer) writeRequest(p []byte) (int, error) {
 			w.respWriter = nil
 		}
 
-		f, err := os.Create(w.reqFilenameFunc(w.reqID))
+		fname := w.reqFilenameFunc(w.reqID)
+		if err := os.MkdirAll(path.Dir(fname), os.ModePerm); err != nil {
+			return 0, err
+		}
+		f, err := os.Create(fname)
 		if err != nil {
 			return 0, err
 		}
@@ -81,7 +86,11 @@ func (w *Writer) writeResponse(p []byte) (int, error) {
 			w.reqWriter = nil
 		}
 
-		f, err := os.Create(w.respFilenameFunc(w.reqID - 1))
+		fname := w.respFilenameFunc(w.reqID - 1)
+		if err := os.MkdirAll(path.Dir(fname), os.ModePerm); err != nil {
+			return 0, err
+		}
+		f, err := os.Create(fname)
 		if err != nil {
 			return 0, err
 		}
