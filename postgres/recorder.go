@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/daulet/replay"
+	"github.com/daulet/replay/internal"
 )
 
 var (
@@ -25,14 +26,14 @@ type recorder struct {
 	chER <-chan byte // Egress read, after chEW
 	wg   *sync.WaitGroup
 
-	writer *replay.Writer
+	writer *internal.Writer
 	reqTee io.Writer
 	resTee io.Writer
 }
 
 var _ io.ReadWriteCloser = (*recorder)(nil)
 
-func NewRecorder(addr string, reqFileFunc, respFileFunc replay.FilenameFunc) (io.ReadWriteCloser, error) {
+func newRecorder(addr string, reqFileFunc, respFileFunc replay.FilenameFunc) (io.ReadWriteCloser, error) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return nil, err
@@ -61,7 +62,7 @@ func NewRecorder(addr string, reqFileFunc, respFileFunc replay.FilenameFunc) (io
 		parseMessages(chEW, chER)
 	}()
 
-	writer := replay.NewWriter(reqFileFunc, respFileFunc)
+	writer := internal.NewWriter(reqFileFunc, respFileFunc)
 	reqTee := writer.RequestWriter()
 	resTee := writer.ResponseWriter()
 

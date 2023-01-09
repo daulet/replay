@@ -13,8 +13,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// TODO rename server
-type Proxy struct {
+type Server struct {
 	ready chan struct{}
 	port  int
 	rw    io.ReadWriteCloser
@@ -22,20 +21,20 @@ type Proxy struct {
 	log *zap.Logger
 }
 
-type ProxyOption func(*Proxy)
+type ServerOption func(*Server)
 
-func ProxyLogger(log *zap.Logger) ProxyOption {
-	return func(p *Proxy) {
+func ServerLogger(log *zap.Logger) ServerOption {
+	return func(p *Server) {
 		p.log = log
 	}
 }
 
-func NewProxy(
+func NewServer(
 	port int,
 	readWriter io.ReadWriteCloser,
-	opts ...ProxyOption,
-) *Proxy {
-	p := &Proxy{
+	opts ...ServerOption,
+) *Server {
+	p := &Server{
 		ready: make(chan struct{}),
 		port:  port,
 		rw:    readWriter,
@@ -48,11 +47,11 @@ func NewProxy(
 	return p
 }
 
-func (p *Proxy) Ready() <-chan struct{} {
+func (p *Server) Ready() <-chan struct{} {
 	return p.ready
 }
 
-func (p *Proxy) Serve(ctx context.Context) error {
+func (p *Server) Serve(ctx context.Context) error {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
@@ -98,7 +97,7 @@ func (p *Proxy) Serve(ctx context.Context) error {
 	}
 }
 
-func (p *Proxy) handle(src io.ReadWriteCloser, dst io.ReadWriter) {
+func (p *Server) handle(src io.ReadWriteCloser, dst io.ReadWriter) {
 	go func() {
 		if _, err := io.Copy(dst, src); err != nil {
 			p.log.Error("write from in to out", zap.Error(err))

@@ -22,15 +22,15 @@ type replayer struct {
 
 var _ io.ReadWriteCloser = (*replayer)(nil)
 
-type ReplayerOption func(*replayer)
+type replayerOption func(*replayer)
 
-func ReplayerLogger(log *zap.Logger) ReplayerOption {
+func replayerLogger(log *zap.Logger) replayerOption {
 	return func(m *replayer) {
 		m.log = log
 	}
 }
 
-func NewReplayer(reqFileFunc, respFileFunc replay.FilenameFunc, opts ...ReplayerOption) (io.ReadWriteCloser, error) {
+func newReplayer(reqFileFunc, respFileFunc replay.FilenameFunc, opts ...replayerOption) (io.ReadWriteCloser, error) {
 	var (
 		reqID     int
 		err       error
