@@ -1,26 +1,28 @@
-package replay
+package redis
 
 import (
 	"io"
 	"net"
+
+	"github.com/daulet/replay"
+	"github.com/daulet/replay/internal"
 )
 
 type Recorder struct {
 	conn net.Conn
 
-	writer *Writer
+	writer *internal.Writer
 	reqTee io.Writer
 	resTee io.Writer
 }
 
-type FilenameFunc func(reqID int) string
-
-func NewRecorder(addr string, reqFileFunc, respFileFunc FilenameFunc) (io.ReadWriteCloser, error) {
+// TODO unexport
+func NewRecorder(addr string, reqFileFunc, respFileFunc replay.FilenameFunc) (io.ReadWriteCloser, error) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
-	writer := NewWriter(reqFileFunc, respFileFunc)
+	writer := internal.NewWriter(reqFileFunc, respFileFunc)
 	reqTee := writer.RequestWriter()
 	resTee := writer.ResponseWriter()
 

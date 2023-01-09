@@ -1,4 +1,4 @@
-package replay
+package internal
 
 import (
 	"context"
@@ -13,14 +13,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type Mode int
-
-const (
-	ModeRecord Mode = iota + 1
-	ModeReplay
-)
-
-type proxy struct {
+// TODO rename server
+type Proxy struct {
 	ready chan struct{}
 	port  int
 	rw    io.ReadWriteCloser
@@ -28,10 +22,10 @@ type proxy struct {
 	log *zap.Logger
 }
 
-type ProxyOption func(*proxy)
+type ProxyOption func(*Proxy)
 
 func ProxyLogger(log *zap.Logger) ProxyOption {
-	return func(p *proxy) {
+	return func(p *Proxy) {
 		p.log = log
 	}
 }
@@ -40,8 +34,8 @@ func NewProxy(
 	port int,
 	readWriter io.ReadWriteCloser,
 	opts ...ProxyOption,
-) *proxy {
-	p := &proxy{
+) *Proxy {
+	p := &Proxy{
 		ready: make(chan struct{}),
 		port:  port,
 		rw:    readWriter,
@@ -54,11 +48,11 @@ func NewProxy(
 	return p
 }
 
-func (p *proxy) Ready() <-chan struct{} {
+func (p *Proxy) Ready() <-chan struct{} {
 	return p.ready
 }
 
-func (p *proxy) Serve(ctx context.Context) error {
+func (p *Proxy) Serve(ctx context.Context) error {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
@@ -104,7 +98,7 @@ func (p *proxy) Serve(ctx context.Context) error {
 	}
 }
 
-func (p *proxy) handle(src io.ReadWriteCloser, dst io.ReadWriter) {
+func (p *Proxy) handle(src io.ReadWriteCloser, dst io.ReadWriter) {
 	go func() {
 		if _, err := io.Copy(dst, src); err != nil {
 			p.log.Error("write from in to out", zap.Error(err))

@@ -3,13 +3,11 @@ package redis_test
 import (
 	"context"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"sync"
 	"testing"
 
-	"github.com/daulet/replay"
 	"github.com/daulet/replay/redis"
 
 	redisv8 "github.com/go-redis/redis/v8"
@@ -30,28 +28,17 @@ func TestRedis(t *testing.T) {
 	}
 	defer logger.Sync()
 
-	reqFunc := func(reqID int) string {
-		return fmt.Sprintf("testdata/%d.request", reqID)
-	}
-	resFunc := func(reqID int) string {
-		return fmt.Sprintf("testdata/%d.response", reqID)
-	}
-
 	tests := []struct {
-		name   string
-		rwFunc func() (io.ReadWriteCloser, error)
+		name string
+		opt  redis.ProxyOption
 	}{
 		{
 			name: "record",
-			rwFunc: func() (io.ReadWriteCloser, error) {
-				return replay.NewRecorder(redisPort, reqFunc, resFunc)
-			},
+			opt:  redis.ProxyRecord(redisPort),
 		},
 		{
 			name: "replay",
-			rwFunc: func() (io.ReadWriteCloser, error) {
-				return redis.NewReplayer(reqFunc, resFunc, redis.ReplayerLogger(logger))
-			},
+			opt:  redis.ProxyReplay(),
 		},
 	}
 
@@ -62,12 +49,10 @@ func TestRedis(t *testing.T) {
 				ctx, cancel = context.WithCancel(context.Background())
 			)
 
-			rw, err := tt.rwFunc()
+			srv, err := redis.NewProxy(port, tt.opt, redis.ProxyLogger(logger))
 			if err != nil {
 				t.Fatal(err)
 			}
-
-			srv := replay.NewProxy(port, rw, replay.ProxyLogger(logger))
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -113,10 +98,8 @@ func TestRedis(t *testing.T) {
 			}
 
 			rdb.Close() // close connection to proxy
-			// redis client does not properly close the connection
-			rw.Close() // close connection to read/writer
-			cancel()   // signal proxy to stop
-			wg.Wait()  // wait for proxy to stop
+			cancel()    // signal proxy to stop
+			wg.Wait()   // wait for proxy to stop
 		})
 	}
 }

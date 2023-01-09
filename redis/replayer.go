@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type matcher struct {
+type replayer struct {
 	reqLen  int
 	lineBuf *bytes.Buffer
 	reqBuf  *bytes.Buffer
@@ -28,17 +28,17 @@ type matcher struct {
 	log *zap.Logger
 }
 
-var _ io.ReadWriteCloser = (*matcher)(nil)
+var _ io.ReadWriteCloser = (*replayer)(nil)
 
-type ReplayerOption func(*matcher)
+type replayerOption func(*replayer)
 
-func ReplayerLogger(log *zap.Logger) ReplayerOption {
-	return func(m *matcher) {
+func replayerLogger(log *zap.Logger) replayerOption {
+	return func(m *replayer) {
 		m.log = log
 	}
 }
 
-func NewReplayer(reqFileFunc, respFileFunc replay.FilenameFunc, opts ...ReplayerOption) (io.ReadWriteCloser, error) {
+func newReplayer(reqFileFunc, respFileFunc replay.FilenameFunc, opts ...replayerOption) (io.ReadWriteCloser, error) {
 	var (
 		reqID     int
 		err       error
@@ -69,7 +69,7 @@ func NewReplayer(reqFileFunc, respFileFunc replay.FilenameFunc, opts ...Replayer
 		reqID++
 	}
 
-	m := &matcher{
+	m := &replayer{
 		lineBuf:   &bytes.Buffer{},
 		reqBuf:    &bytes.Buffer{},
 		output:    &bytes.Buffer{},
@@ -83,7 +83,7 @@ func NewReplayer(reqFileFunc, respFileFunc replay.FilenameFunc, opts ...Replayer
 	return m, nil
 }
 
-func (m *matcher) Read(p []byte) (int, error) {
+func (m *replayer) Read(p []byte) (int, error) {
 	// we stay on CPU unless we don't imitate latency
 	<-time.After(time.Millisecond)
 	m.outMux.RLock()
@@ -91,7 +91,7 @@ func (m *matcher) Read(p []byte) (int, error) {
 	return m.output.Read(p)
 }
 
-func (m *matcher) Write(p []byte) (int, error) {
+func (m *replayer) Write(p []byte) (int, error) {
 	for _, b := range p {
 		m.lineBuf.WriteByte(b)
 		if b == '\n' {
@@ -103,7 +103,7 @@ func (m *matcher) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func (m *matcher) Close() error {
+func (m *replayer) Close() error {
 	return nil
 }
 
@@ -111,7 +111,7 @@ func (m *matcher) Close() error {
 // first line contains *<number of parameters>
 // what follow is 2 * <number of parameters> lines
 // More on data types: https://github.com/go-redis/redis/blob/master/internal/proto/reader.go#L16-L32
-func (m *matcher) writeLine(line []byte) (n int, err error) {
+func (m *replayer) writeLine(line []byte) (n int, err error) {
 	n, err = m.reqBuf.Write(line)
 	if m.reqLen == 0 {
 		// first line in format "*<int>\t\n"

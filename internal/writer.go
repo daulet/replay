@@ -1,10 +1,12 @@
-package replay
+package internal
 
 import (
 	"io"
 	"os"
 	"path"
 	"sync"
+
+	"github.com/daulet/replay"
 )
 
 type funcWriter struct {
@@ -18,8 +20,8 @@ func (w *funcWriter) Write(p []byte) (int, error) {
 }
 
 type Writer struct {
-	reqFilenameFunc  FilenameFunc
-	respFilenameFunc FilenameFunc
+	reqFilenameFunc  replay.FilenameFunc
+	respFilenameFunc replay.FilenameFunc
 
 	writeMux   sync.Mutex
 	reqID      int
@@ -27,7 +29,7 @@ type Writer struct {
 	respWriter io.WriteCloser
 }
 
-func NewWriter(reqFilenameFunc, respFilenameFunc FilenameFunc) *Writer {
+func NewWriter(reqFilenameFunc, respFilenameFunc replay.FilenameFunc) *Writer {
 	return &Writer{
 		reqFilenameFunc:  reqFilenameFunc,
 		respFilenameFunc: respFilenameFunc,
