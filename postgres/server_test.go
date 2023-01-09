@@ -148,6 +148,12 @@ func TestPostgres(t *testing.T) {
 				return postgres.NewRecorder(fmt.Sprintf("localhost:%d", dbPort), reqFunc, resFunc)
 			},
 		},
+		{
+			name: "replay",
+			rwFunc: func() (io.ReadWriteCloser, error) {
+				return postgres.NewReplayer(reqFunc, resFunc, postgres.ReplayerLogger(logger))
+			},
+		},
 	}
 
 	for _, tt := range tests {

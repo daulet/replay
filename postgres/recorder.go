@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"io"
 	"net"
-	"sort"
 	"sync"
 
 	"github.com/daulet/replay"
@@ -101,36 +100,12 @@ func NewRecorder(addr string, reqFileFunc, respFileFunc replay.FilenameFunc) (io
 
 // Start-up phase as described in https://www.postgresql.org/docs/current/protocol-overview.html
 func startUp(chW chan byte, chR chan<- byte) {
-	writeN(chR, readN(chW, 4)) // length
-	// TODO confirm close-complete?
-	writeN(chR, readN(chW, 4)) // message type?
-	// key-value pairs
-	m := make(map[string]string)
-	for b := <-chW; b != 0; b = <-chW { // can't start with NUL
-		var ss []string
-		buf := []byte{b}
-		for k := 0; k < 2; k++ {
-			for b := <-chW; b != 0; b = <-chW {
-				buf = append(buf, b)
-			}
-			ss = append(ss, string(buf))
-			buf = nil
-		}
-		m[ss[0]] = ss[1]
+	buf := readN(chW, 4)
+	length := int(binary.BigEndian.Uint32(buf))
+	for i := 0; i < length-4; i++ {
+		buf = append(buf, <-chW)
 	}
-
-	var keys []string
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		writeN(chR, []byte(k))
-		writeN(chR, []byte{0}) // NUL
-		writeN(chR, []byte(m[k]))
-		writeN(chR, []byte{0}) // NUL
-	}
-	writeN(chR, []byte{0}) // NUL
+	writeN(chR, deterministicStartup(buf))
 }
 
 // Normal phase as described in https://www.postgresql.org/docs/current/protocol-overview.html
@@ -158,20 +133,6 @@ func parseMessages(chW chan byte, chR chan<- byte) {
 			// length value includes itself and NULL terminator
 			writeN(chR, readN(chW, length-4))
 		}
-	}
-}
-
-func readN(ch chan byte, n int) []byte {
-	bs := make([]byte, n)
-	for i := 0; i < n; i++ {
-		bs[i] = <-ch
-	}
-	return bs
-}
-
-func writeN(ch chan<- byte, bs []byte) {
-	for _, b := range bs {
-		ch <- b
 	}
 }
 
