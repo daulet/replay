@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daulet/replay"
 	"github.com/daulet/replay/postgres"
 
 	_ "github.com/lib/pq"
@@ -130,29 +129,18 @@ func TestPostgres(t *testing.T) {
 	}
 	defer logger.Sync()
 
-	reqFunc := func(reqID int) string {
-		return fmt.Sprintf("testdata/%d.request", reqID)
-	}
-	resFunc := func(reqID int) string {
-		return fmt.Sprintf("testdata/%d.response", reqID)
-	}
-
 	tests := []struct {
-		name   string
-		rwFunc func() (io.ReadWriteCloser, error)
+		name string
+		opt  postgres.ProxyOption
 	}{
 		{
 			// TODO don't override files, compare them instead
 			name: "record",
-			rwFunc: func() (io.ReadWriteCloser, error) {
-				return postgres.NewRecorder(fmt.Sprintf("localhost:%d", dbPort), reqFunc, resFunc)
-			},
+			opt:  postgres.ProxyRecord(fmt.Sprintf("localhost:%d", dbPort)),
 		},
 		{
 			name: "replay",
-			rwFunc: func() (io.ReadWriteCloser, error) {
-				return postgres.NewReplayer(reqFunc, resFunc, postgres.ReplayerLogger(logger))
-			},
+			opt:  postgres.ProxyReplay(),
 		},
 	}
 
@@ -163,12 +151,10 @@ func TestPostgres(t *testing.T) {
 				ctx, cancel = context.WithCancel(context.Background())
 			)
 
-			rw, err := tt.rwFunc()
+			srv, err := postgres.NewProxy(port, tt.opt, postgres.ProxyLogger(logger))
 			if err != nil {
 				t.Fatal(err)
 			}
-
-			srv := replay.NewProxy(port, rw, replay.ProxyLogger(logger))
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -248,8 +234,6 @@ func TestPostgres(t *testing.T) {
 			db.Close() // close connection to proxy
 			cancel()   // signal proxy to stop
 			wg.Wait()  // wait for proxy to stop
-			// TODO order inconsistent with redis/server_test.go
-			rw.Close() // close connection to read/writer
 		})
 	}
 }

@@ -20,6 +20,7 @@ const (
 )
 
 type proxy struct {
+	// TODO embed
 	srv *internal.Server
 	rw  io.ReadWriteCloser
 
@@ -98,7 +99,6 @@ func NewProxy(
 	if err != nil {
 		return nil, err
 	}
-	// TODO who is responsible for closing the rw?
 	p.srv = internal.NewServer(port, rw, internal.ServerLogger(p.log))
 	p.rw = rw
 	return p, nil
@@ -109,11 +109,6 @@ func (p *proxy) Ready() <-chan struct{} {
 }
 
 func (p *proxy) Serve(ctx context.Context) error {
-	go func() {
-		<-ctx.Done()
-		// TODO can we get rid of this?
-		// redis client does not properly close the connection
-		p.rw.Close()
-	}()
+	defer p.rw.Close()
 	return p.srv.Serve(ctx)
 }

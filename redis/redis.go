@@ -20,6 +20,7 @@ const (
 )
 
 type proxy struct {
+	// TODO embed
 	srv *internal.Server
 	rw  io.ReadWriteCloser
 
