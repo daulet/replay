@@ -89,7 +89,7 @@ func NewProxy(
 	)
 	switch p.mode {
 	case modeRecord:
-		rw, err = NewRecorder(p.remoteAddr, p.reqFileFunc, p.respFileFunc)
+		rw, err = newRecorder(p.remoteAddr, p.reqFileFunc, p.respFileFunc)
 	case modeReplay:
 		rw, err = newReplayer(p.reqFileFunc, p.respFileFunc, replayerLogger(p.log))
 	default:
