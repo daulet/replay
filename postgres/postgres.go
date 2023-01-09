@@ -20,9 +20,8 @@ const (
 )
 
 type proxy struct {
-	// TODO embed
-	srv *internal.Server
-	rw  io.ReadWriteCloser
+	*internal.Server
+	rw io.ReadWriteCloser
 
 	// required
 	mode       mode
@@ -99,16 +98,12 @@ func NewProxy(
 	if err != nil {
 		return nil, err
 	}
-	p.srv = internal.NewServer(port, rw, internal.ServerLogger(p.log))
+	p.Server = internal.NewServer(port, rw, internal.ServerLogger(p.log))
 	p.rw = rw
 	return p, nil
 }
 
-func (p *proxy) Ready() <-chan struct{} {
-	return p.srv.Ready()
-}
-
 func (p *proxy) Serve(ctx context.Context) error {
 	defer p.rw.Close()
-	return p.srv.Serve(ctx)
+	return p.Server.Serve(ctx)
 }
