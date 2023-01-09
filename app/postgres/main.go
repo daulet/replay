@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/daulet/replay/redis"
+	"github.com/daulet/replay/postgres"
 
 	"go.uber.org/zap"
 )
 
-// $ go run app/redis/main.go --port 8080 --target localhost:6379
-// $ redis-cli -p 8080
+// $ go run app/postgres/main.go --port 8080 --target localhost:5432
+// $ psql -h localhost -p 8080 -U testuser testdb
 
 func main() {
 	logger, err := zap.NewProduction()
@@ -28,26 +28,26 @@ func main() {
 		port   = flag.Int("port", 0, "port to listen on")
 		target = flag.String("target", "", "target host:port")
 
-		opts = []redis.ProxyOption{
-			redis.SavedRequest(func(reqID int) string {
+		opts = []postgres.ProxyOption{
+			postgres.SavedRequest(func(reqID int) string {
 				// TODO parametrize testdata dir
 				return fmt.Sprintf("/testdata/%d.request", reqID)
 			}),
-			redis.SavedResponse(func(reqID int) string {
+			postgres.SavedResponse(func(reqID int) string {
 				return fmt.Sprintf("/testdata/%d.response", reqID)
 			}),
-			redis.ProxyLogger(logger),
+			postgres.ProxyLogger(logger),
 		}
 	)
 	flag.Parse()
 
-	reOpt := redis.ProxyReplay()
+	reOpt := postgres.ProxyReplay()
 	if !*replay {
-		reOpt = redis.ProxyRecord(*target)
+		reOpt = postgres.ProxyRecord(*target)
 	}
 	opts = append(opts, reOpt)
 
-	srv, err := redis.NewProxy(*port, opts...)
+	srv, err := postgres.NewProxy(*port, opts...)
 	if err != nil {
 		log.Fatal(err)
 	}

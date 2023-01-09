@@ -98,7 +98,6 @@ func NewProxy(
 	if err != nil {
 		return nil, err
 	}
-	// TODO who is responsible for closing the rw?
 	p.Server = internal.NewServer(port, rw, internal.ServerLogger(p.log))
 	p.rw = rw
 	return p, nil
