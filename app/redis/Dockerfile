@@ -17,4 +17,4 @@ COPY --from=builder /usr/bin/redis .
 
 EXPOSE 6379
 
-ENTRYPOINT [ "/usr/bin/redis", "--port=6379", "--record", "--target=redis:6379" ]
+ENTRYPOINT [ "/usr/bin/redis", "--port=6379", "--target=redis:6379" ]

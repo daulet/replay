@@ -29,3 +29,14 @@ jobs:
       
     - name: Test data race
       run: go test -v -count=100 -race ./...
+
+    - name: check modified files
+      run: |
+        if [ -z "$(git status --porcelain)" ]; then
+          echo "no extra writes."
+        else
+          git status
+          git diff
+          echo "unexpected writes detected!"
+          exit 1
+        fi
