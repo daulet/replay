@@ -16,12 +16,13 @@ import (
 
 type replayer struct {
 	reqLen  int
+	lineMux sync.Mutex
 	lineBuf *bytes.Buffer
 	reqBuf  *bytes.Buffer
 
 	// lock arount 'output' is necessary since
 	// both read&write will access it
-	outMux    sync.RWMutex
+	outMux    sync.Mutex
 	output    *bytes.Buffer
 	responses map[[32]byte][][]byte
 
@@ -86,12 +87,14 @@ func newReplayer(reqFileFunc, respFileFunc replay.FilenameFunc, opts ...replayer
 func (m *replayer) Read(p []byte) (int, error) {
 	// we stay on CPU unless we don't imitate latency
 	<-time.After(time.Millisecond)
-	m.outMux.RLock()
-	defer m.outMux.RUnlock()
+	m.outMux.Lock()
+	defer m.outMux.Unlock()
 	return m.output.Read(p)
 }
 
 func (m *replayer) Write(p []byte) (int, error) {
+	m.lineMux.Lock()
+	defer m.lineMux.Unlock()
 	for _, b := range p {
 		m.lineBuf.WriteByte(b)
 		if b == '\n' {
