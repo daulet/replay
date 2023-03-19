@@ -1,0 +1,29 @@
+version: "3.6"
+
+services:
+  replay:
+    build:
+      context: ../..
+      dockerfile: app/postgres/Dockerfile
+    restart: always
+    volumes:
+      - ./testdata:/testdata
+    ports:
+      - "5432:5432"
+    networks:
+      - replay
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: testuser
+      listen_addresses: '*'
+    restart: always
+    expose:
+      - "5432"
+    networks:
+      - replay
+
+networks:
+  replay:
+    name: replay
