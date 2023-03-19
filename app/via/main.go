@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// This is great for capturing new protocol, to disassemble it
 func main() {
 	logger, err := zap.NewProduction()
 	if err != nil {

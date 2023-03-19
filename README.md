@@ -15,10 +15,12 @@ Now play with `redis-cli` or point your app to `:6379`.
 
 * ~~Support Redis~~
 * ~~Support Postgres~~
-* Support generic TCP, timeout based request detection on replay;
+* Stabilize Postgres tests - see CI;
+* Demo app calling Postgres and uses Redis as cache;
+* Support generic TCP, timeout based request detection on replay, switch of direction to detect request on record, also see via;
 * Ready to deploy containers for record/replay;
 * Support HTTP;
-* Add execution layer for running tests;
+* Add execution layer for running tests, like controller that can __execute__ recordings to trigger tests, without having to implement them in test;
 * Support gRPC;
 * Examples with popular APIs like S3 or Stripe;
 * Address race issues after eliminiating potential problems:
