@@ -19,6 +19,8 @@ var (
 	fixedSecretKey = []byte{2, 4, 8, 16}
 	// Override of server_version extended to required length.
 	fixedServerVersion = "X"
+	// Override row objectID
+	fixedRowObjectID = []byte{0, 0, 4, 33}
 )
 
 type recorder struct {
@@ -137,23 +139,34 @@ func parseMessages(log *zap.Logger, chW chan byte, chR chan<- byte) {
 		case 'S': // ParameterStatus
 			vals := readStrings(readN(chW, length-4))
 			if vals[0] == "server_version" {
-				vals[1] = strings.Repeat(fixedServerVersion, len(vals[1]))
+				srvVer := strings.Repeat(fixedServerVersion, len(vals[1]))
+				log.Debug("ParameterStatus: overriding server_version",
+					zap.String("before", vals[1]),
+					zap.String("after", srvVer),
+				)
+				vals[1] = srvVer
 			}
 			log.Debug("S", zap.Strings("vals", vals))
 			writeN(chR, writeStrings(vals))
 		case 'T': // RowDescription
-			// id@ ([len=23][0 1 105 100 0 0 0 64 1 0 1 0 0 0 23 0 4 255 255 255 255 0 0])
-			// id@ ([len=23][0 1 105 100 0 0 0 64 4 0 1 0 0 0 23 0 4 255 255 255 255 0 0])
-			// id@ ([len=23][0 1 105 100 0 0 0 64 1 0 1 0 0 0 23 0 4 255 255 255 255 0 0])
-			// Specifies the number of fields in a row (can be zero). 0 1
-			// The field name. 105 100 0
-			// If the field can be identified as a column of a specific table, the object ID of the table; otherwise zero. 0 0 64 1
-			// If the field can be identified as a column of a specific table, the attribute number of the column; otherwise zero. 0 1
-			// The object ID of the field's data type. 0 0 0 23
-			// The data type size.0 4
-			// The type modifier. 255 255 255 255
-			// The format code being used for the field. 0 0
-			fallthrough
+			// Specifies the number of fields in a row (can be zero).
+			rowsBytes := readN(chW, 2)
+			writeN(chR, rowsBytes)
+			// Then, for each field, there is the following:
+			rows := int(binary.BigEndian.Uint16(rowsBytes))
+			for i := 0; i < rows; i++ {
+				//  The field name.
+				writeN(chR, readString(chW))
+				//  If the field can be identified as a column of a specific table, the object ID of the table; otherwise zero.
+				objectIDBytes := readN(chW, 4)
+				log.Debug("RowDescription: overriding objectID",
+					zap.Int("before", int(binary.BigEndian.Uint32(objectIDBytes))),
+					zap.Int("after", int(binary.BigEndian.Uint32(fixedRowObjectID))),
+				)
+				writeN(chR, fixedRowObjectID)
+				// The remainder of row payload according to the format.
+				writeN(chR, readN(chW, 14))
+			}
 		default:
 			// length value includes itself and NULL terminator
 			writeN(chR, readN(chW, length-4))

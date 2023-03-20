@@ -8,6 +8,17 @@ func readN(ch <-chan byte, n int) []byte {
 	return bs
 }
 
+func readString(ch <-chan byte) []byte {
+	var buf []byte
+	for b := range ch {
+		buf = append(buf, b)
+		if b == 0 {
+			break
+		}
+	}
+	return buf
+}
+
 func writeN(ch chan<- byte, bs []byte) {
 	for _, b := range bs {
 		ch <- b

@@ -123,7 +123,7 @@ func TestParse(t *testing.T) {
 func TestPostgres(t *testing.T) {
 	const port = 5555
 
-	logger, err := zap.NewProduction()
+	logger, err := zap.NewDevelopment()
 	if err != nil {
 		t.Fatal(err)
 	}
