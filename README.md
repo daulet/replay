@@ -15,7 +15,6 @@ Now play with `redis-cli` or point your app to `:6379`.
 
 * ~~Support Redis~~
 * ~~Support Postgres~~
-* Stabilize Postgres tests - see CI;
 * Demo app calling Postgres and uses Redis as cache;
 * Support generic TCP, timeout based request detection on replay, switch of direction to detect request on record, also see via;
 * Ready to deploy containers for record/replay;
