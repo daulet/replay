@@ -16,21 +16,11 @@ type replayer struct {
 	wg      *sync.WaitGroup
 	readCh  chan byte
 	writeCh chan byte
-
-	log *zap.Logger
 }
 
 var _ io.ReadWriteCloser = (*replayer)(nil)
 
-type replayerOption func(*replayer)
-
-func replayerLogger(log *zap.Logger) replayerOption {
-	return func(m *replayer) {
-		m.log = log
-	}
-}
-
-func newReplayer(reqFileFunc, respFileFunc replay.FilenameFunc, opts ...replayerOption) (io.ReadWriteCloser, error) {
+func newReplayer(log *zap.Logger, reqFileFunc, respFileFunc replay.FilenameFunc) (io.ReadWriteCloser, error) {
 	var (
 		reqID     int
 		err       error
@@ -66,18 +56,13 @@ func newReplayer(reqFileFunc, respFileFunc replay.FilenameFunc, opts ...replayer
 		wg:      &wg,
 		readCh:  make(chan byte),
 		writeCh: make(chan byte),
-
-		log: zap.NewNop(),
-	}
-	for _, opt := range opts {
-		opt(r)
 	}
 	wg.Add(1)
 	go func() {
 		defer r.wg.Done()
 		defer close(r.writeCh)
 		defer close(r.readCh)
-		process(r.log, r.readCh, r.writeCh, responses)
+		process(log, r.readCh, r.writeCh, responses)
 	}()
 	return r, nil
 }

@@ -89,9 +89,9 @@ func NewProxy(
 	)
 	switch p.mode {
 	case modeRecord:
-		rw, err = newRecorder(p.remoteAddr, p.reqFileFunc, p.respFileFunc)
+		rw, err = newRecorder(p.log, p.remoteAddr, p.reqFileFunc, p.respFileFunc)
 	case modeReplay:
-		rw, err = newReplayer(p.reqFileFunc, p.respFileFunc, replayerLogger(p.log))
+		rw, err = newReplayer(p.log, p.reqFileFunc, p.respFileFunc)
 	default:
 		err = fmt.Errorf("unknown proxy mode. must set ProxyRecord or ProxyReplay option")
 	}

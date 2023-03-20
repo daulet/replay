@@ -4,10 +4,12 @@ import (
 	"encoding/binary"
 	"io"
 	"net"
+	"strings"
 	"sync"
 
 	"github.com/daulet/replay"
 	"github.com/daulet/replay/internal"
+	"go.uber.org/zap"
 )
 
 var (
@@ -15,6 +17,8 @@ var (
 	fixedProcessID = []byte{0, 0, 0, 33}
 	// Override of "The secret key of this backend.", see message type 'K'.
 	fixedSecretKey = []byte{2, 4, 8, 16}
+	// Override of server_version extended to required length.
+	fixedServerVersion = "X"
 )
 
 type recorder struct {
@@ -33,7 +37,7 @@ type recorder struct {
 
 var _ io.ReadWriteCloser = (*recorder)(nil)
 
-func newRecorder(addr string, reqFileFunc, respFileFunc replay.FilenameFunc) (io.ReadWriteCloser, error) {
+func newRecorder(log *zap.Logger, addr string, reqFileFunc, respFileFunc replay.FilenameFunc) (io.ReadWriteCloser, error) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return nil, err
@@ -52,14 +56,14 @@ func newRecorder(addr string, reqFileFunc, respFileFunc replay.FilenameFunc) (io
 		defer wg.Done()
 		defer close(chIR)
 		startUp(chIW, chIR)
-		parseMessages(chIW, chIR)
+		parseMessages(log, chIW, chIR)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer close(chER)
-		parseMessages(chEW, chER)
+		parseMessages(log, chEW, chER)
 	}()
 
 	writer := internal.NewWriter(reqFileFunc, respFileFunc)
@@ -110,7 +114,7 @@ func startUp(chW chan byte, chR chan<- byte) {
 }
 
 // Normal phase as described in https://www.postgresql.org/docs/current/protocol-overview.html
-func parseMessages(chW chan byte, chR chan<- byte) {
+func parseMessages(log *zap.Logger, chW chan byte, chR chan<- byte) {
 	// Parse messages: https://www.postgresql.org/docs/current/protocol-message-formats.html
 	for b := range chW {
 		writeN(chR, []byte{b}) // message type
@@ -121,7 +125,7 @@ func parseMessages(chW chan byte, chR chan<- byte) {
 		switch b {
 		case 'X': // Terminate
 			return
-		case 'K':
+		case 'K': // BackendKeyData
 			for range fixedProcessID {
 				<-chW
 			}
@@ -130,6 +134,26 @@ func parseMessages(chW chan byte, chR chan<- byte) {
 			}
 			writeN(chR, fixedProcessID)
 			writeN(chR, fixedSecretKey)
+		case 'S': // ParameterStatus
+			vals := readStrings(readN(chW, length-4))
+			if vals[0] == "server_version" {
+				vals[1] = strings.Repeat(fixedServerVersion, len(vals[1]))
+			}
+			log.Debug("S", zap.Strings("vals", vals))
+			writeN(chR, writeStrings(vals))
+		case 'T': // RowDescription
+			// id@ ([len=23][0 1 105 100 0 0 0 64 1 0 1 0 0 0 23 0 4 255 255 255 255 0 0])
+			// id@ ([len=23][0 1 105 100 0 0 0 64 4 0 1 0 0 0 23 0 4 255 255 255 255 0 0])
+			// id@ ([len=23][0 1 105 100 0 0 0 64 1 0 1 0 0 0 23 0 4 255 255 255 255 0 0])
+			// Specifies the number of fields in a row (can be zero). 0 1
+			// The field name. 105 100 0
+			// If the field can be identified as a column of a specific table, the object ID of the table; otherwise zero. 0 0 64 1
+			// If the field can be identified as a column of a specific table, the attribute number of the column; otherwise zero. 0 1
+			// The object ID of the field's data type. 0 0 0 23
+			// The data type size.0 4
+			// The type modifier. 255 255 255 255
+			// The format code being used for the field. 0 0
+			fallthrough
 		default:
 			// length value includes itself and NULL terminator
 			writeN(chR, readN(chW, length-4))
