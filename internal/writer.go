@@ -10,12 +10,15 @@ import (
 )
 
 type funcWriter struct {
+	mux   *sync.Mutex
 	write func(p []byte) (int, error)
 }
 
 var _ io.Writer = (*funcWriter)(nil)
 
 func (w *funcWriter) Write(p []byte) (int, error) {
+	w.mux.Lock()
+	defer w.mux.Unlock()
 	return w.write(p)
 }
 
@@ -23,7 +26,7 @@ type Writer struct {
 	reqFilenameFunc  replay.FilenameFunc
 	respFilenameFunc replay.FilenameFunc
 
-	writeMux   sync.Mutex
+	mux        sync.Mutex
 	reqID      int
 	reqWriter  io.WriteCloser
 	respWriter io.WriteCloser
@@ -38,12 +41,14 @@ func NewWriter(reqFilenameFunc, respFilenameFunc replay.FilenameFunc) *Writer {
 
 func (w *Writer) RequestWriter() io.Writer {
 	return &funcWriter{
+		mux:   &w.mux,
 		write: w.writeRequest,
 	}
 }
 
 func (w *Writer) ResponseWriter() io.Writer {
 	return &funcWriter{
+		mux:   &w.mux,
 		write: w.writeResponse,
 	}
 }
@@ -56,47 +61,42 @@ func (w *Writer) Close() error {
 }
 
 func (w *Writer) writeRequest(p []byte) (int, error) {
-	w.writeMux.Lock()
-	defer w.writeMux.Unlock()
-	if w.reqWriter == nil {
-		if w.respWriter != nil {
-			w.respWriter.Close()
-			w.respWriter = nil
-		}
-
-		fname := w.reqFilenameFunc(w.reqID)
-		if err := os.MkdirAll(path.Dir(fname), os.ModePerm); err != nil {
-			return 0, err
-		}
-		f, err := os.Create(fname)
-		if err != nil {
-			return 0, err
-		}
-		w.reqWriter = f
-
-		w.reqID++
+	if w.reqWriter != nil {
+		return w.reqWriter.Write(p)
 	}
+	if w.respWriter != nil {
+		w.respWriter.Close()
+		w.respWriter = nil
+	}
+	fname := w.reqFilenameFunc(w.reqID)
+	if err := os.MkdirAll(path.Dir(fname), os.ModePerm); err != nil {
+		return 0, err
+	}
+	f, err := os.Create(fname)
+	if err != nil {
+		return 0, err
+	}
+	w.reqWriter = f
+	w.reqID++
 	return w.reqWriter.Write(p)
 }
 
 func (w *Writer) writeResponse(p []byte) (int, error) {
-	w.writeMux.Lock()
-	defer w.writeMux.Unlock()
-	if w.respWriter == nil {
-		if w.reqWriter != nil {
-			w.reqWriter.Close()
-			w.reqWriter = nil
-		}
-
-		fname := w.respFilenameFunc(w.reqID - 1)
-		if err := os.MkdirAll(path.Dir(fname), os.ModePerm); err != nil {
-			return 0, err
-		}
-		f, err := os.Create(fname)
-		if err != nil {
-			return 0, err
-		}
-		w.respWriter = f
+	if w.respWriter != nil {
+		return w.respWriter.Write(p)
 	}
+	if w.reqWriter != nil {
+		w.reqWriter.Close()
+		w.reqWriter = nil
+	}
+	fname := w.respFilenameFunc(w.reqID - 1)
+	if err := os.MkdirAll(path.Dir(fname), os.ModePerm); err != nil {
+		return 0, err
+	}
+	f, err := os.Create(fname)
+	if err != nil {
+		return 0, err
+	}
+	w.respWriter = f
 	return w.respWriter.Write(p)
 }
