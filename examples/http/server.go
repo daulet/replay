@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"html"
 	"net/http"
 )
 
-func serve(port int) error {
+func Serve(ctx context.Context, port int) error {
+	srv := &http.Server{
+		Addr: fmt.Sprintf(":%d", port),
+	}
+
 	http.HandleFunc("/foo", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
 	})
@@ -15,5 +20,13 @@ func serve(port int) error {
 		fmt.Fprintf(w, "Hi, %q", html.EscapeString(r.URL.Path))
 	})
 
-	return http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	go func() {
+		<-ctx.Done()
+		srv.Shutdown(context.Background())
+	}()
+
+	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		return err
+	}
+	return nil
 }
