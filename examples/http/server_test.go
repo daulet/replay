@@ -3,8 +3,10 @@ package main_test
 import (
 	"context"
 	"flag"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +15,8 @@ import (
 
 	"github.com/daulet/replay"
 )
+
+const testdataDir = "testdata"
 
 var update = flag.Bool("update", false, "update golden files")
 
@@ -28,7 +32,7 @@ func TestServe(t *testing.T) {
 		}
 	}()
 
-	srv, err := replay.NewHTTPServer(8081, *update, "localhost:8080", "http.record")
+	srv, err := replay.NewHTTPServer(8081, *update, "localhost:8080", fmt.Sprintf("%s/%s", testdataDir, "http.record"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,5 +81,7 @@ func TestServe(t *testing.T) {
 
 func TestMain(m *testing.M) {
 	flag.Parse()
+	// create if not exists
+	_ = os.Mkdir(testdataDir, 0755)
 	m.Run()
 }

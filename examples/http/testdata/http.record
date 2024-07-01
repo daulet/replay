@@ -30,7 +30,7 @@
   },
   "Entries": [
     {
-      "ID": "a851d41403dde0ba",
+      "ID": "6c056b036d457f91",
       "Request": {
         "Method": "GET",
         "URL": "http://localhost:8080/foo",
@@ -60,14 +60,14 @@
             "text/plain; charset=utf-8"
           ],
           "Date": [
-            "Mon, 01 Jul 2024 04:48:25 GMT"
+            "Mon, 01 Jul 2024 04:52:55 GMT"
           ]
         },
         "Body": "SGVsbG8sICIvZm9vIg=="
       }
     },
     {
-      "ID": "715d1ca7c4f8eb38",
+      "ID": "b3c42dcd4cbc4085",
       "Request": {
         "Method": "GET",
         "URL": "http://localhost:8080/bar",
@@ -97,7 +97,7 @@
             "text/plain; charset=utf-8"
           ],
           "Date": [
-            "Mon, 01 Jul 2024 04:48:25 GMT"
+            "Mon, 01 Jul 2024 04:52:55 GMT"
           ]
         },
         "Body": "SGksICIvYmFyIg=="
