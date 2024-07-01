@@ -30,7 +30,7 @@
   },
   "Entries": [
     {
-      "ID": "6c056b036d457f91",
+      "ID": "c657ee792c4ce3b6",
       "Request": {
         "Method": "GET",
         "URL": "http://localhost:8080/foo",
@@ -48,29 +48,72 @@
         ]
       },
       "Response": {
+        "StatusCode": 301,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "40"
+          ],
+          "Content-Type": [
+            "text/html; charset=utf-8"
+          ],
+          "Date": [
+            "Mon, 01 Jul 2024 05:34:57 GMT"
+          ],
+          "Location": [
+            "/foo/"
+          ]
+        },
+        "Body": "PGEgaHJlZj0iL2Zvby8iPk1vdmVkIFBlcm1hbmVudGx5PC9hPi4KCg=="
+      }
+    },
+    {
+      "ID": "398a4b54e540036d",
+      "Request": {
+        "Method": "GET",
+        "URL": "http://localhost:8080/foo/",
+        "Header": {
+          "Accept-Encoding": [
+            "gzip"
+          ],
+          "Referer": [
+            "http://localhost:8080/foo"
+          ],
+          "User-Agent": [
+            "Go-http-client/1.1"
+          ]
+        },
+        "MediaType": "",
+        "BodyParts": [
+          ""
+        ]
+      },
+      "Response": {
         "StatusCode": 200,
         "Proto": "HTTP/1.1",
         "ProtoMajor": 1,
         "ProtoMinor": 1,
         "Header": {
           "Content-Length": [
-            "13"
+            "14"
           ],
           "Content-Type": [
             "text/plain; charset=utf-8"
           ],
           "Date": [
-            "Mon, 01 Jul 2024 04:52:55 GMT"
+            "Mon, 01 Jul 2024 05:34:57 GMT"
           ]
         },
-        "Body": "SGVsbG8sICIvZm9vIg=="
+        "Body": "SGVsbG8sICIvZm9vLyI="
       }
     },
     {
-      "ID": "b3c42dcd4cbc4085",
+      "ID": "aa9c0273238876d6",
       "Request": {
         "Method": "GET",
-        "URL": "http://localhost:8080/bar",
+        "URL": "http://localhost:8080/foo/bar",
         "Header": {
           "Accept-Encoding": [
             "gzip"
@@ -91,16 +134,133 @@
         "ProtoMinor": 1,
         "Header": {
           "Content-Length": [
-            "10"
+            "17"
           ],
           "Content-Type": [
             "text/plain; charset=utf-8"
           ],
           "Date": [
-            "Mon, 01 Jul 2024 04:52:55 GMT"
+            "Mon, 01 Jul 2024 05:34:57 GMT"
           ]
         },
-        "Body": "SGksICIvYmFyIg=="
+        "Body": "SGVsbG8sICIvZm9vL2JhciI="
+      }
+    },
+    {
+      "ID": "dbc9999544799617",
+      "Request": {
+        "Method": "GET",
+        "URL": "http://localhost:8080/bar",
+        "Header": {
+          "Accept-Encoding": [
+            "gzip"
+          ],
+          "User-Agent": [
+            "Go-http-client/1.1"
+          ]
+        },
+        "MediaType": "",
+        "BodyParts": [
+          ""
+        ]
+      },
+      "Response": {
+        "StatusCode": 301,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "40"
+          ],
+          "Content-Type": [
+            "text/html; charset=utf-8"
+          ],
+          "Date": [
+            "Mon, 01 Jul 2024 05:34:57 GMT"
+          ],
+          "Location": [
+            "/bar/"
+          ]
+        },
+        "Body": "PGEgaHJlZj0iL2Jhci8iPk1vdmVkIFBlcm1hbmVudGx5PC9hPi4KCg=="
+      }
+    },
+    {
+      "ID": "6edc8f440b4e35ba",
+      "Request": {
+        "Method": "GET",
+        "URL": "http://localhost:8080/bar/",
+        "Header": {
+          "Accept-Encoding": [
+            "gzip"
+          ],
+          "Referer": [
+            "http://localhost:8080/bar"
+          ],
+          "User-Agent": [
+            "Go-http-client/1.1"
+          ]
+        },
+        "MediaType": "",
+        "BodyParts": [
+          ""
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "11"
+          ],
+          "Content-Type": [
+            "text/plain; charset=utf-8"
+          ],
+          "Date": [
+            "Mon, 01 Jul 2024 05:34:57 GMT"
+          ]
+        },
+        "Body": "SGksICIvYmFyLyI="
+      }
+    },
+    {
+      "ID": "04a8e527acc3ca0e",
+      "Request": {
+        "Method": "GET",
+        "URL": "http://localhost:8080/bar/foo",
+        "Header": {
+          "Accept-Encoding": [
+            "gzip"
+          ],
+          "User-Agent": [
+            "Go-http-client/1.1"
+          ]
+        },
+        "MediaType": "",
+        "BodyParts": [
+          ""
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "14"
+          ],
+          "Content-Type": [
+            "text/plain; charset=utf-8"
+          ],
+          "Date": [
+            "Mon, 01 Jul 2024 05:34:57 GMT"
+          ]
+        },
+        "Body": "SGksICIvYmFyL2ZvbyI="
       }
     }
   ]

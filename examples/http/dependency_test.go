@@ -20,7 +20,7 @@ const testdataDir = "testdata"
 
 var update = flag.Bool("update", false, "update golden files")
 
-func TestServe(t *testing.T) {
+func TestServeDependency(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
 	// start the server under test
@@ -30,7 +30,7 @@ func TestServe(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := example.Serve(ctx, 8080); err != nil {
+		if err := example.ServeDependency(ctx, 8080); err != nil {
 			t.Error(err)
 		}
 	}()
@@ -53,12 +53,22 @@ func TestServe(t *testing.T) {
 		{
 			name:     "foo",
 			url:      "http://localhost:8081/foo",
-			wantBody: "Hello, \"/foo\"",
+			wantBody: "Hello, \"/foo/\"",
+		},
+		{
+			name:     "foo/bar",
+			url:      "http://localhost:8081/foo/bar",
+			wantBody: "Hello, \"/foo/bar\"",
 		},
 		{
 			name:     "bar",
 			url:      "http://localhost:8081/bar",
-			wantBody: "Hi, \"/bar\"",
+			wantBody: "Hi, \"/bar/\"",
+		},
+		{
+			name:     "bar/foo",
+			url:      "http://localhost:8081/bar/foo",
+			wantBody: "Hi, \"/bar/foo\"",
 		},
 	}
 	for _, test := range tests {

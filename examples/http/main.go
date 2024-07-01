@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	if err := Serve(context.Background(), 8080); err != nil {
+	if err := ServeDependency(context.Background(), 8080); err != nil {
 		log.Fatal(err)
 	}
 }

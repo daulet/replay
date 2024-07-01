@@ -7,16 +7,16 @@ import (
 	"net/http"
 )
 
-func Serve(ctx context.Context, port int) error {
+func ServeDependency(ctx context.Context, port int) error {
 	srv := &http.Server{
 		Addr: fmt.Sprintf(":%d", port),
 	}
 
-	http.HandleFunc("/foo", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/foo/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
 	})
 
-	http.HandleFunc("/bar", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/bar/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hi, %q", html.EscapeString(r.URL.Path))
 	})
 
