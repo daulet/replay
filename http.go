@@ -18,12 +18,17 @@ type HTTPServer struct {
 	// internal state
 	wg  *sync.WaitGroup
 	srv *http.Server
-	r   *httpreplay.Recorder
+	r   recorderOrReplayer
+}
+
+type recorderOrReplayer interface {
+	io.Closer
+	Client() *http.Client
 }
 
 // TODO strongly typed params for URL and Path
 // TODO perhaps Serving part should be separate from the constructor
-func NewHTTPServer(port int, remoteAddr string, recordFile string) (*HTTPServer, error) {
+func NewHTTPServer(port int, record bool, remoteAddr string, recordFile string) (*HTTPServer, error) {
 	{
 		f, err := os.OpenFile(recordFile, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -31,8 +36,15 @@ func NewHTTPServer(port int, remoteAddr string, recordFile string) (*HTTPServer,
 		}
 		f.Close()
 	}
-	// TODO switch based on mode
-	rep, err := httpreplay.NewRecorderWithOpts(recordFile)
+
+	var (
+		r   recorderOrReplayer
+		err error
+	)
+	r, err = httpreplay.NewReplayer(recordFile)
+	if record {
+		r, err = httpreplay.NewRecorderWithOpts(recordFile)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to open record file: [%w]", err)
 	}
@@ -41,7 +53,7 @@ func NewHTTPServer(port int, remoteAddr string, recordFile string) (*HTTPServer,
 		Addr: fmt.Sprintf(":%d", port),
 		Handler: &httpHandler{
 			remoteAddr: remoteAddr,
-			client:     rep.Client(),
+			client:     r.Client(),
 		},
 	}
 
@@ -55,7 +67,7 @@ func NewHTTPServer(port int, remoteAddr string, recordFile string) (*HTTPServer,
 	return &HTTPServer{
 		wg:  &wg,
 		srv: srv,
-		r:   rep,
+		r:   r,
 	}, nil
 }
 

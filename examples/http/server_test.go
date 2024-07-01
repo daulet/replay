@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"context"
+	"flag"
 	"io"
 	"net/http"
 	"sync"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/daulet/replay"
 )
+
+var update = flag.Bool("update", false, "update golden files")
 
 func TestServe(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -25,7 +28,7 @@ func TestServe(t *testing.T) {
 		}
 	}()
 
-	srv, err := replay.NewHTTPServer(8081, "localhost:8080", "http.record")
+	srv, err := replay.NewHTTPServer(8081, *update, "localhost:8080", "http.record")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,4 +73,9 @@ func TestServe(t *testing.T) {
 	cancel()
 	srv.Close()
 	wg.Wait()
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	m.Run()
 }
