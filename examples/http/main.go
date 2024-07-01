@@ -6,7 +6,15 @@ import (
 )
 
 func main() {
-	if err := ServeDependency(context.Background(), 8080); err != nil {
+	ctx := context.Background()
+
+	go func() {
+		if err := ServeDependency(ctx, 8081); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	if err := ServeApplication(ctx, 8080, "localhost:8081"); err != nil {
 		log.Fatal(err)
 	}
 }

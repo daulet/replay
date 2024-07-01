@@ -1,6 +1,6 @@
 # HTTP example
 
-This is a sample HTTP application that depends on another HTTP dependency. It meant to emulate use cases where you'd like test HTTP application without having to run the dependency service, e.g. because it is expensive to run/invoke.
+This is a sample HTTP application that depends on another HTTP dependency. It meant to emulate use cases where you'd like test HTTP application without having to run the dependency service, e.g. because it is expensive to start or slow to invoke.
 
 * Dependency service simply returns "Hello, \<path\>" for all paths starting with "/foo" and "Hi, \<path\>" for all paths starting with "/bar". Everything else returns 404.
 * Application service parses the HTTP path, squares any number it finds in path components and passes updated path to the dependency service.
