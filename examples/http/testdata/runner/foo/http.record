@@ -1,0 +1,70 @@
+{
+  "Initial": null,
+  "Version": "0.2",
+  "Converter": {
+    "ScrubBody": null,
+    "ClearHeaders": [
+      "^X-Goog-.*Encryption-Key$"
+    ],
+    "RemoveRequestHeaders": [
+      "^Authorization$",
+      "^Proxy-Authorization$",
+      "^Connection$",
+      "^Content-Type$",
+      "^Date$",
+      "^Host$",
+      "^Transfer-Encoding$",
+      "^Via$",
+      "^X-Forwarded-.*$",
+      "^X-Cloud-Trace-Context$",
+      "^X-Goog-Api-Client$",
+      "^X-Google-.*$",
+      "^X-Gfe-.*$"
+    ],
+    "RemoveResponseHeaders": [
+      "^X-Google-.*$",
+      "^X-Gfe-.*$"
+    ],
+    "ClearParams": null,
+    "RemoveParams": null
+  },
+  "Entries": [
+    {
+      "ID": "ab60b57f0b80d0d1",
+      "Request": {
+        "Method": "GET",
+        "URL": "http://localhost:8082/foo/",
+        "Header": {
+          "Accept-Encoding": [
+            "gzip"
+          ],
+          "User-Agent": [
+            "Go-http-client/1.1"
+          ]
+        },
+        "MediaType": "",
+        "BodyParts": [
+          ""
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "14"
+          ],
+          "Content-Type": [
+            "text/plain; charset=utf-8"
+          ],
+          "Date": [
+            "Mon, 01 Jul 2024 11:35:56 GMT"
+          ]
+        },
+        "Body": "SGVsbG8sICIvZm9vLyI="
+      }
+    }
+  ]
+}

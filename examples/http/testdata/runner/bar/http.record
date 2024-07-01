@@ -1,0 +1,113 @@
+{
+  "Initial": null,
+  "Version": "0.2",
+  "Converter": {
+    "ScrubBody": null,
+    "ClearHeaders": [
+      "^X-Goog-.*Encryption-Key$"
+    ],
+    "RemoveRequestHeaders": [
+      "^Authorization$",
+      "^Proxy-Authorization$",
+      "^Connection$",
+      "^Content-Type$",
+      "^Date$",
+      "^Host$",
+      "^Transfer-Encoding$",
+      "^Via$",
+      "^X-Forwarded-.*$",
+      "^X-Cloud-Trace-Context$",
+      "^X-Goog-Api-Client$",
+      "^X-Google-.*$",
+      "^X-Gfe-.*$"
+    ],
+    "RemoveResponseHeaders": [
+      "^X-Google-.*$",
+      "^X-Gfe-.*$"
+    ],
+    "ClearParams": null,
+    "RemoveParams": null
+  },
+  "Entries": [
+    {
+      "ID": "9fff6b59e6091bd2",
+      "Request": {
+        "Method": "GET",
+        "URL": "http://localhost:8082/bar",
+        "Header": {
+          "Accept-Encoding": [
+            "gzip"
+          ],
+          "User-Agent": [
+            "Go-http-client/1.1"
+          ]
+        },
+        "MediaType": "",
+        "BodyParts": [
+          ""
+        ]
+      },
+      "Response": {
+        "StatusCode": 301,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "40"
+          ],
+          "Content-Type": [
+            "text/html; charset=utf-8"
+          ],
+          "Date": [
+            "Mon, 01 Jul 2024 11:42:00 GMT"
+          ],
+          "Location": [
+            "/bar/"
+          ]
+        },
+        "Body": "PGEgaHJlZj0iL2Jhci8iPk1vdmVkIFBlcm1hbmVudGx5PC9hPi4KCg=="
+      }
+    },
+    {
+      "ID": "7957e62d0ff767aa",
+      "Request": {
+        "Method": "GET",
+        "URL": "http://localhost:8082/bar/",
+        "Header": {
+          "Accept-Encoding": [
+            "gzip"
+          ],
+          "Referer": [
+            "http://localhost:8082/bar"
+          ],
+          "User-Agent": [
+            "Go-http-client/1.1"
+          ]
+        },
+        "MediaType": "",
+        "BodyParts": [
+          ""
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "11"
+          ],
+          "Content-Type": [
+            "text/plain; charset=utf-8"
+          ],
+          "Date": [
+            "Mon, 01 Jul 2024 11:42:00 GMT"
+          ]
+        },
+        "Body": "SGksICIvYmFyLyI="
+      }
+    }
+  ]
+}
