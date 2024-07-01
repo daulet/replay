@@ -1,19 +1,21 @@
 package replay
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
 type httpRunner struct {
-	writeDir string
+	remoteAddr string
+	writeDir   string
 
 	// internal control
 	done chan struct{}
@@ -27,8 +29,9 @@ type httpRunner struct {
 func NewHTTPRunner(port int, remoteAddr string, writeDir string) (*httpRunner, error) {
 	srvMux := http.NewServeMux()
 	runner := &httpRunner{
-		writeDir: writeDir,
-		done:     make(chan struct{}),
+		remoteAddr: fmt.Sprintf("http://%s", remoteAddr),
+		writeDir:   writeDir,
+		done:       make(chan struct{}),
 		srv: &http.Server{
 			Addr:    fmt.Sprintf(":%v", port),
 			Handler: srvMux,
@@ -40,8 +43,15 @@ func NewHTTPRunner(port int, remoteAddr string, writeDir string) (*httpRunner, e
 		return nil, fmt.Errorf("failed to parse remote address: [%w]", err)
 	}
 	proxy := httputil.NewSingleHostReverseProxy(url)
+	// TODO replace reverse proxy as the current implementation only provides callback
+	// without original request. Could be as simple as implementing a custom http.ResponseWriter
+	// and pass it to ServeHTTP in srvMux.HandleFunc("/", ...)
 	proxy.ModifyResponse = func(r *http.Response) error {
-		return runner.recordResponse(r)
+		return runner.recordResponse(r, nil)
+	}
+	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		runner.recordResponse(nil, err)
+		w.WriteHeader(http.StatusBadGateway)
 	}
 	srvMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		runner.recordRequest(r)
@@ -67,6 +77,91 @@ func (h *httpRunner) Serve() error {
 	return nil
 }
 
+type indexedResponse struct {
+	index int
+	resp  *http.Response
+	err   error
+}
+
+func (h *httpRunner) Replay(updateResponses bool) error {
+	var (
+		reqs      []*http.Request
+		wantResps [][]byte
+	)
+	for i := 0; ; i++ {
+		reqPath := filepath.Join(h.writeDir, fmt.Sprintf("request%v.data", i))
+		f, err := os.Open(reqPath)
+		if err != nil {
+			break
+		}
+		req, err := http.ReadRequest(bufio.NewReader(f))
+		if err != nil {
+			return fmt.Errorf("failed to read request from file %q: [%w]", reqPath, err)
+		}
+		reqs = append(reqs, req)
+
+		respPath := filepath.Join(h.writeDir, fmt.Sprintf("response%v.data", i))
+		b, err := os.ReadFile(respPath)
+		if err != nil {
+			return fmt.Errorf("failed to read response from file %q: [%w]", respPath, err)
+		}
+		wantResps = append(wantResps, b)
+	}
+	resps := make([]*http.Response, len(reqs))
+	{
+		respCh := make(chan indexedResponse)
+		var wg sync.WaitGroup
+		for i, req := range reqs {
+			wg.Add(1)
+			go func(i int, req *http.Request) {
+				defer wg.Done()
+
+				req.RequestURI = ""
+				u, err := url.Parse(fmt.Sprintf("%s%s", h.remoteAddr, req.URL.Path))
+				if err != nil {
+					respCh <- indexedResponse{index: i, err: err}
+					return
+				}
+				req.URL = u
+				resp, err := http.DefaultClient.Do(req)
+				respCh <- indexedResponse{i, resp, err}
+			}(i, req)
+		}
+		for range reqs {
+			resp := <-respCh
+			// TODO deal with error
+			resps[resp.index] = resp.resp
+		}
+		wg.Wait()
+		close(respCh)
+	}
+	for i, resp := range resps {
+		var rawResp []byte
+		var err error
+		if resp != nil {
+			// remove Date header as it's not deterministic
+			resp.Header.Del("Date")
+			rawResp, err = httputil.DumpResponse(resp, true)
+			if err != nil {
+				return fmt.Errorf("failed to dump response: [%w]", err)
+			}
+		}
+		if updateResponses {
+			err := os.WriteFile(filepath.Join(h.writeDir, fmt.Sprintf("response%v.data", i)), rawResp, 0o644)
+			if err != nil {
+				return fmt.Errorf("failed to update response file: [%w]", err)
+			}
+			continue
+		}
+		wantResp := wantResps[i]
+		// TODO user friendly diff
+		if !bytes.Equal(wantResp, rawResp) {
+			return fmt.Errorf("response mismatch for request %v", i)
+		}
+	}
+	return nil
+}
+
 func (h *httpRunner) recordRequest(r *http.Request) {
 	fullReq, _ := httputil.DumpRequest(r, true)
 	h.mux.RLock()
@@ -83,17 +178,7 @@ func (h *httpRunner) recordRequest(r *http.Request) {
 	}
 }
 
-func (h *httpRunner) recordResponse(resp *http.Response) error {
-	if resp.Body == nil {
-		return nil
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
+func (h *httpRunner) recordResponse(resp *http.Response, respErr error) error {
 	h.mux.Lock()
 	f, err := os.OpenFile(fmt.Sprintf("%s/response%v.data", h.writeDir, h.requestID), os.O_CREATE|os.O_WRONLY, 0o644)
 	h.requestID += 1
@@ -103,11 +188,21 @@ func (h *httpRunner) recordResponse(resp *http.Response) error {
 		return err
 	}
 	defer f.Close()
-	_, err = f.Write(body)
-	if err != nil {
-		// h.log.Errorf("failed to write response file: %v", err)
-		return err
+
+	if respErr != nil {
+		f.Write([]byte(respErr.Error()))
+		return nil
 	}
-	resp.Body = io.NopCloser(bytes.NewBuffer(body))
+
+	// remove Date header as it's not deterministic
+	resp.Header.Del("Date")
+	rawResp, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		return fmt.Errorf("failed to dump response: [%w]", err)
+	}
+	_, err = f.Write(rawResp)
+	if err != nil {
+		return fmt.Errorf("failed to write response file: [%w]", err)
+	}
 	return nil
 }

@@ -8,15 +8,17 @@ import (
 )
 
 func ServeDependency(ctx context.Context, port int) error {
+	mux := http.NewServeMux()
 	srv := &http.Server{
-		Addr: fmt.Sprintf(":%d", port),
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: mux,
 	}
 
-	http.HandleFunc("/foo/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/foo/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
 	})
 
-	http.HandleFunc("/bar/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/bar/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hi, %q", html.EscapeString(r.URL.Path))
 	})
 

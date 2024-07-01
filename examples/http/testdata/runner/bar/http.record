@@ -30,7 +30,7 @@
   },
   "Entries": [
     {
-      "ID": "9fff6b59e6091bd2",
+      "ID": "8bc5b3f191f91613",
       "Request": {
         "Method": "GET",
         "URL": "http://localhost:8082/bar",
@@ -60,7 +60,7 @@
             "text/html; charset=utf-8"
           ],
           "Date": [
-            "Mon, 01 Jul 2024 11:42:00 GMT"
+            "Mon, 01 Jul 2024 12:54:19 GMT"
           ],
           "Location": [
             "/bar/"
@@ -70,7 +70,7 @@
       }
     },
     {
-      "ID": "7957e62d0ff767aa",
+      "ID": "03c7f8d7399f8b92",
       "Request": {
         "Method": "GET",
         "URL": "http://localhost:8082/bar/",
@@ -103,7 +103,7 @@
             "text/plain; charset=utf-8"
           ],
           "Date": [
-            "Mon, 01 Jul 2024 11:42:00 GMT"
+            "Mon, 01 Jul 2024 12:54:19 GMT"
           ]
         },
         "Body": "SGksICIvYmFyLyI="

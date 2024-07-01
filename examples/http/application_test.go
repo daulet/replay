@@ -209,7 +209,12 @@ func TestApplicationWithRunner(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = runner.Serve()
+			switch {
+			case *create:
+				err = runner.Serve()
+			default:
+				err = runner.Replay(*update)
+			}
 			if err != nil {
 				t.Error(err)
 			}

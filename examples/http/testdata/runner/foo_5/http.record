@@ -30,7 +30,7 @@
   },
   "Entries": [
     {
-      "ID": "1c99bccb7e835a23",
+      "ID": "dace78bb43b9a13c",
       "Request": {
         "Method": "GET",
         "URL": "http://localhost:8082/foo/25",
@@ -60,7 +60,7 @@
             "text/plain; charset=utf-8"
           ],
           "Date": [
-            "Mon, 01 Jul 2024 11:39:14 GMT"
+            "Mon, 01 Jul 2024 12:51:12 GMT"
           ]
         },
         "Body": "SGVsbG8sICIvZm9vLzI1Ig=="
