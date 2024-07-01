@@ -23,6 +23,9 @@ var update = flag.Bool("update", false, "update golden files")
 func TestServe(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
+	// start the server under test
+	// since it's blocking call, we run it in a goroutine
+	// and wait for it to finish with wg.Wait() below
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -32,11 +35,16 @@ func TestServe(t *testing.T) {
 		}
 	}()
 
+	// Start the record/replay server, controlled by the -update flag.
+	// In replay mode (default), it reads responses from the record file and never sends requests to the server under test (port 8080).
+	// In record/update mode, it sends requests to the server under test and records responses to the record file, which later could
+	// be used in replay mode.
 	srv, err := replay.NewHTTPServer(8081, *update, "localhost:8080", fmt.Sprintf("%s/%s", testdataDir, "http.record"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Note: URLs point to record/replay server, and it will either replay response or forward the request to the server under test.
 	tests := []struct {
 		name     string
 		url      string
@@ -71,9 +79,12 @@ func TestServe(t *testing.T) {
 				t.Errorf("got %q, want %q", body, test.wantBody)
 			}
 		})
-
 	}
 
+	// order matters here:
+	// 1. cancel the context to stop the server under test.
+	// 2. close the record/replay server.
+	// 3. wait for the server under test to return to guarantee the port is released.
 	cancel()
 	srv.Close()
 	wg.Wait()
