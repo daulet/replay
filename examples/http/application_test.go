@@ -19,13 +19,12 @@ import (
 var update = flag.Bool("update", false, "update golden files")
 
 func TestServeApplication(t *testing.T) {
+	var wg sync.WaitGroup
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
 	const testdataDir = "testdata/application"
 	// create if not exists
 	_ = os.Mkdir(testdataDir, 0755)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-
-	var wg sync.WaitGroup
 
 	// start the dependency server if necessary, i.e. if recording
 	if *update {
@@ -44,21 +43,22 @@ func TestServeApplication(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := example.ServeApplication(ctx, 8081, "localhost:8082"); err != nil {
+		// Note the application points to the record/replay port, not the dependency service directly.
+		// This is the only modification needed to make the application testable - swap out address of dependency service.
+		if err := example.ServeApplication(ctx, 8080, "localhost:8081"); err != nil {
 			t.Error(err)
 		}
 	}()
 
 	// Start the record/replay server, controlled by the -update flag.
-	// In replay mode (default), it reads responses from the record file and never sends requests to the server under test (port 8080).
-	// In record/update mode, it sends requests to the server under test and records responses to the record file, which later could
+	// In replay mode (default), it reads responses from the record file and never sends requests to the dependency service (port 8082).
+	// In record/update mode, it sends requests to the dependency service and records responses to the specified file, which later could
 	// be used in replay mode.
-	srv, err := replay.NewHTTPServer(8080, *update, "localhost:8081", fmt.Sprintf("%s/%s", testdataDir, "http.record"))
+	srv, err := replay.NewHTTPServer(8081, *update, "localhost:8082", fmt.Sprintf("%s/%s", testdataDir, "http.record"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Note: URLs point to record/replay server, and it will either replay response or forward the request to the server under test.
 	tests := []struct {
 		name     string
 		url      string
@@ -106,9 +106,10 @@ func TestServeApplication(t *testing.T) {
 	}
 
 	// order matters here:
-	// 1. cancel the context to stop the server under test.
+	// 1. cancel the context to stop application and dependency services.
 	// 2. close the record/replay server.
-	// 3. wait for the server under test to return to guarantee the port is released.
+	// 3. wait for all services to return to guarantee corresponding ports are released,
+	// 	  which is important for testing with -count=X.
 	cancel()
 	srv.Close()
 	wg.Wait()

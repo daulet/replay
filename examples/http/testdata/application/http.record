@@ -30,13 +30,56 @@
   },
   "Entries": [
     {
-      "ID": "f75cf6368eb1ceb7",
+      "ID": "3a8ebc27c89654ca",
       "Request": {
         "Method": "GET",
-        "URL": "http://localhost:8081/foo",
+        "URL": "http://localhost:8082/foo",
         "Header": {
           "Accept-Encoding": [
             "gzip"
+          ],
+          "User-Agent": [
+            "Go-http-client/1.1"
+          ]
+        },
+        "MediaType": "",
+        "BodyParts": [
+          ""
+        ]
+      },
+      "Response": {
+        "StatusCode": 301,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "40"
+          ],
+          "Content-Type": [
+            "text/html; charset=utf-8"
+          ],
+          "Date": [
+            "Mon, 01 Jul 2024 06:43:21 GMT"
+          ],
+          "Location": [
+            "/foo/"
+          ]
+        },
+        "Body": "PGEgaHJlZj0iL2Zvby8iPk1vdmVkIFBlcm1hbmVudGx5PC9hPi4KCg=="
+      }
+    },
+    {
+      "ID": "2f0db739dbbf761a",
+      "Request": {
+        "Method": "GET",
+        "URL": "http://localhost:8082/foo/",
+        "Header": {
+          "Accept-Encoding": [
+            "gzip"
+          ],
+          "Referer": [
+            "http://localhost:8082/foo"
           ],
           "User-Agent": [
             "Go-http-client/1.1"
@@ -60,17 +103,17 @@
             "text/plain; charset=utf-8"
           ],
           "Date": [
-            "Mon, 01 Jul 2024 06:34:00 GMT"
+            "Mon, 01 Jul 2024 06:43:21 GMT"
           ]
         },
         "Body": "SGVsbG8sICIvZm9vLyI="
       }
     },
     {
-      "ID": "4e142302851b51f0",
+      "ID": "35765c533719fb08",
       "Request": {
         "Method": "GET",
-        "URL": "http://localhost:8081/foo/5",
+        "URL": "http://localhost:8082/foo/25",
         "Header": {
           "Accept-Encoding": [
             "gzip"
@@ -97,20 +140,63 @@
             "text/plain; charset=utf-8"
           ],
           "Date": [
-            "Mon, 01 Jul 2024 06:34:00 GMT"
+            "Mon, 01 Jul 2024 06:43:21 GMT"
           ]
         },
         "Body": "SGVsbG8sICIvZm9vLzI1Ig=="
       }
     },
     {
-      "ID": "a61a4c21ef895eb0",
+      "ID": "e509c04873180f27",
       "Request": {
         "Method": "GET",
-        "URL": "http://localhost:8081/bar",
+        "URL": "http://localhost:8082/bar",
         "Header": {
           "Accept-Encoding": [
             "gzip"
+          ],
+          "User-Agent": [
+            "Go-http-client/1.1"
+          ]
+        },
+        "MediaType": "",
+        "BodyParts": [
+          ""
+        ]
+      },
+      "Response": {
+        "StatusCode": 301,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "40"
+          ],
+          "Content-Type": [
+            "text/html; charset=utf-8"
+          ],
+          "Date": [
+            "Mon, 01 Jul 2024 06:43:21 GMT"
+          ],
+          "Location": [
+            "/bar/"
+          ]
+        },
+        "Body": "PGEgaHJlZj0iL2Jhci8iPk1vdmVkIFBlcm1hbmVudGx5PC9hPi4KCg=="
+      }
+    },
+    {
+      "ID": "52d0e522e622a18c",
+      "Request": {
+        "Method": "GET",
+        "URL": "http://localhost:8082/bar/",
+        "Header": {
+          "Accept-Encoding": [
+            "gzip"
+          ],
+          "Referer": [
+            "http://localhost:8082/bar"
           ],
           "User-Agent": [
             "Go-http-client/1.1"
@@ -134,17 +220,17 @@
             "text/plain; charset=utf-8"
           ],
           "Date": [
-            "Mon, 01 Jul 2024 06:34:00 GMT"
+            "Mon, 01 Jul 2024 06:43:21 GMT"
           ]
         },
         "Body": "SGksICIvYmFyLyI="
       }
     },
     {
-      "ID": "06e5538f7be6383d",
+      "ID": "c3c735c9fa0e2630",
       "Request": {
         "Method": "GET",
-        "URL": "http://localhost:8081/bar/7",
+        "URL": "http://localhost:8082/bar/49",
         "Header": {
           "Accept-Encoding": [
             "gzip"
@@ -171,7 +257,7 @@
             "text/plain; charset=utf-8"
           ],
           "Date": [
-            "Mon, 01 Jul 2024 06:34:00 GMT"
+            "Mon, 01 Jul 2024 06:43:21 GMT"
           ]
         },
         "Body": "SGksICIvYmFyLzQ5Ig=="
