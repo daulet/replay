@@ -2,7 +2,6 @@ package replay
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -11,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 type httpRunner struct {
@@ -154,9 +155,8 @@ func (h *httpRunner) Replay(updateResponses bool) error {
 			continue
 		}
 		wantResp := wantResps[i]
-		// TODO user friendly diff
-		if !bytes.Equal(wantResp, rawResp) {
-			return fmt.Errorf("response mismatch for request %v", i)
+		if diff := cmp.Diff(string(wantResp), string(rawResp)); diff != "" {
+			return fmt.Errorf("%d-th HTTP response diff: (-got +want)\n%s", i, diff)
 		}
 	}
 	return nil
