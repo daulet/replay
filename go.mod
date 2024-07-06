@@ -1,6 +1,6 @@
 module github.com/daulet/replay
 
-go 1.22.2
+go 1.20
 
 require (
 	github.com/google/go-cmdtest v0.4.0
