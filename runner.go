@@ -3,7 +3,9 @@ package replay
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -78,16 +80,20 @@ func (h *httpRunner) Serve() error {
 	return nil
 }
 
+type httpResponse struct {
+	resp *http.Response
+	err  error
+}
+
 type indexedResponse struct {
+	httpResponse
 	index int
-	resp  *http.Response
-	err   error
 }
 
 func (h *httpRunner) Replay(updateResponses bool) error {
 	var (
 		reqs      []*http.Request
-		wantResps [][]byte
+		wantResps []*httpResponse
 	)
 	for i := 0; ; i++ {
 		reqPath := filepath.Join(h.writeDir, fmt.Sprintf("request%v.data", i))
@@ -102,13 +108,27 @@ func (h *httpRunner) Replay(updateResponses bool) error {
 		reqs = append(reqs, req)
 
 		respPath := filepath.Join(h.writeDir, fmt.Sprintf("response%v.data", i))
-		b, err := os.ReadFile(respPath)
+		f, err = os.Open(respPath)
+		if err != nil {
+			respPath := filepath.Join(h.writeDir, fmt.Sprintf("response%v.err", i))
+			f, err = os.Open(respPath)
+			if err != nil {
+				return fmt.Errorf("failed to open response file %q: [%w]", respPath, err)
+			}
+			b, err := io.ReadAll(f)
+			if err != nil {
+				return fmt.Errorf("failed to read response from file %q: [%w]", respPath, err)
+			}
+			wantResps = append(wantResps, &httpResponse{err: fmt.Errorf("%s", b)})
+			continue
+		}
+		resp, err := http.ReadResponse(bufio.NewReader(f), nil)
 		if err != nil {
 			return fmt.Errorf("failed to read response from file %q: [%w]", respPath, err)
 		}
-		wantResps = append(wantResps, b)
+		wantResps = append(wantResps, &httpResponse{resp: resp})
 	}
-	resps := make([]*http.Response, len(reqs))
+	resps := make([]*httpResponse, len(reqs))
 	{
 		respCh := make(chan indexedResponse)
 		var wg sync.WaitGroup
@@ -120,18 +140,17 @@ func (h *httpRunner) Replay(updateResponses bool) error {
 				req.RequestURI = ""
 				u, err := url.Parse(fmt.Sprintf("%s%s", h.remoteAddr, req.URL.Path))
 				if err != nil {
-					respCh <- indexedResponse{index: i, err: err}
+					respCh <- indexedResponse{httpResponse{err: err}, i}
 					return
 				}
 				req.URL = u
 				resp, err := http.DefaultClient.Do(req)
-				respCh <- indexedResponse{i, resp, err}
+				respCh <- indexedResponse{httpResponse{resp, err}, i}
 			}(i, req)
 		}
 		for range reqs {
 			resp := <-respCh
-			// TODO deal with error
-			resps[resp.index] = resp.resp
+			resps[resp.index] = &resp.httpResponse
 		}
 		wg.Wait()
 		close(respCh)
@@ -139,14 +158,18 @@ func (h *httpRunner) Replay(updateResponses bool) error {
 	for i, resp := range resps {
 		var rawResp []byte
 		var err error
-		if resp != nil {
+		if resp.resp != nil {
 			// remove Date header as it's not deterministic
-			resp.Header.Del("Date")
-			rawResp, err = httputil.DumpResponse(resp, true)
+			resp.resp.Header.Del("Date")
+			rawResp, err = httputil.DumpResponse(resp.resp, true)
 			if err != nil {
 				return fmt.Errorf("failed to dump response: [%w]", err)
 			}
+		} else {
+			// unwrap error to remove http layer addition: "Get "http://localhost:1234/foo": "
+			rawResp = []byte(errors.Unwrap(resp.err).Error())
 		}
+		// TODO update correct file: .data or .err
 		if updateResponses {
 			err := os.WriteFile(filepath.Join(h.writeDir, fmt.Sprintf("response%v.data", i)), rawResp, 0o644)
 			if err != nil {
@@ -154,8 +177,21 @@ func (h *httpRunner) Replay(updateResponses bool) error {
 			}
 			continue
 		}
+
 		wantResp := wantResps[i]
-		if diff := cmp.Diff(string(wantResp), string(rawResp)); diff != "" {
+		if wantResp.err != nil {
+			if diff := cmp.Diff(wantResp.err.Error(), string(rawResp)); diff != "" {
+				return fmt.Errorf("%d-th HTTP error diff: (-got +want)\n%s", i, diff)
+			}
+			continue
+		}
+
+		wantResp.resp.Header.Del("Date")
+		rawWantResp, err := httputil.DumpResponse(wantResp.resp, true)
+		if err != nil {
+			return fmt.Errorf("failed to dump response: [%w]", err)
+		}
+		if diff := cmp.Diff(string(rawWantResp), string(rawResp)); diff != "" {
 			return fmt.Errorf("%d-th HTTP response diff: (-got +want)\n%s", i, diff)
 		}
 	}
@@ -180,7 +216,11 @@ func (h *httpRunner) recordRequest(r *http.Request) {
 
 func (h *httpRunner) recordResponse(resp *http.Response, respErr error) error {
 	h.mux.Lock()
-	f, err := os.OpenFile(fmt.Sprintf("%s/response%v.data", h.writeDir, h.requestID), os.O_CREATE|os.O_WRONLY, 0o644)
+	filename := fmt.Sprintf("%s/response%v.data", h.writeDir, h.requestID)
+	if respErr != nil {
+		filename = fmt.Sprintf("%s/response%v.err", h.writeDir, h.requestID)
+	}
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0o644)
 	h.requestID += 1
 	h.mux.Unlock()
 	if err != nil {
