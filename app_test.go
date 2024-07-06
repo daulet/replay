@@ -1,6 +1,3 @@
-//go:build cli.test
-// +build cli.test
-
 package replay_test
 
 import (
@@ -140,6 +137,8 @@ func TestUnreachable(t *testing.T) {
 		})
 	}
 }
+
+// TODO add a test with expected diff so we can validate via runner_test
 
 func serve(ctx context.Context, port int) error {
 	mux := http.NewServeMux()
