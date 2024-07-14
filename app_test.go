@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -136,6 +137,62 @@ func TestUnreachable(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUpdateUnavailable(t *testing.T) {
+	testdataDir := findTestdataDir(t, "testdata/unavailable")
+	// TODO harcoded test case, can we do better?
+	testDir := filepath.Join(testdataDir, "foo")
+	runner, err := replay.NewHTTPRunner(8079, "localhost:1234", testDir)
+	if err != nil {
+		t.Error(err)
+	}
+	err = runner.Replay(true)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestRecordUnavailable(t *testing.T) {
+	testdataDir := findTestdataDir(t, "testdata/unavailable")
+	// TODO harcoded test case, can we do better?
+	testDir := filepath.Join(testdataDir, "foo")
+	runner, err := replay.NewHTTPRunner(8079, "localhost:1234", testDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		err = runner.Serve()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	<-runner.Ready()
+
+	// make http request
+	resp, err := http.Get("http://localhost:8079/foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	// read the body, the contents don't matter as that will be asserted by diff in recorded responses
+	_, err = io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = http.Get("http://localhost:8079/stop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wg.Wait()
 }
 
 // TODO add a test with expected diff so we can validate via runner_test

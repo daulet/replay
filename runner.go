@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -21,7 +22,8 @@ type httpRunner struct {
 	writeDir   string
 
 	// internal control
-	done chan struct{}
+	ready chan struct{}
+	done  chan struct{}
 
 	// internal state
 	srv       *http.Server
@@ -34,6 +36,7 @@ func NewHTTPRunner(port int, remoteAddr string, writeDir string) (*httpRunner, e
 	runner := &httpRunner{
 		remoteAddr: fmt.Sprintf("http://%s", remoteAddr),
 		writeDir:   writeDir,
+		ready:      make(chan struct{}),
 		done:       make(chan struct{}),
 		srv: &http.Server{
 			Addr:    fmt.Sprintf(":%v", port),
@@ -69,12 +72,22 @@ func NewHTTPRunner(port int, remoteAddr string, writeDir string) (*httpRunner, e
 	return runner, nil
 }
 
+// Runner is listening for incoming requests on specified port.
+func (h *httpRunner) Ready() <-chan struct{} {
+	return h.ready
+}
+
 func (h *httpRunner) Serve() error {
 	go func() {
 		<-h.done
 		_ = h.srv.Shutdown(context.Background())
 	}()
-	if err := h.srv.ListenAndServe(); err != http.ErrServerClosed {
+	lstr, err := net.Listen("tcp", h.srv.Addr)
+	if err != nil {
+		return fmt.Errorf("failed to listen on address %q: [%w]", h.srv.Addr, err)
+	}
+	close(h.ready)
+	if err := h.srv.Serve(lstr); err != http.ErrServerClosed {
 		return err
 	}
 	return nil
@@ -169,9 +182,12 @@ func (h *httpRunner) Replay(updateResponses bool) error {
 			// unwrap error to remove http layer addition: "Get "http://localhost:1234/foo": "
 			rawResp = []byte(errors.Unwrap(resp.err).Error())
 		}
-		// TODO update correct file: .data or .err
 		if updateResponses {
-			err := os.WriteFile(filepath.Join(h.writeDir, fmt.Sprintf("response%v.data", i)), rawResp, 0o644)
+			respPath := filepath.Join(h.writeDir, fmt.Sprintf("response%v.data", i))
+			if resp.err != nil {
+				respPath = filepath.Join(h.writeDir, fmt.Sprintf("response%v.err", i))
+			}
+			err := os.WriteFile(respPath, rawResp, 0o644)
 			if err != nil {
 				return fmt.Errorf("failed to update response file: [%w]", err)
 			}
