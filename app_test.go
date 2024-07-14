@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -97,19 +96,10 @@ func TestRunner(t *testing.T) {
 					<-runner.Ready()
 
 					// make http request
-					resp, err := http.Get(fmt.Sprintf("http://localhost:8079/%s", testCase))
+					_, err := http.Get(fmt.Sprintf("http://localhost:8079/%s", testCase))
 					if err != nil {
 						t.Fatal(err)
 					}
-					// TODO do we even need to read body?
-					defer resp.Body.Close()
-
-					// read the body, the contents don't matter as that will be asserted by diff in recorded responses
-					_, err = io.ReadAll(resp.Body)
-					if err != nil {
-						t.Fatal(err)
-					}
-
 					// stop test recording
 					_, err = http.Get("http://localhost:8079/stop")
 					if err != nil {
@@ -131,83 +121,57 @@ func TestRunner(t *testing.T) {
 
 func TestUnreachable(t *testing.T) {
 	testdataDir := findTestdataDir(t, "testdata/unavailable")
-
 	// create if not exists
 	_ = os.Mkdir(testdataDir, 0755)
-
 	testCases, err := testCases(testdataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase, func(t *testing.T) {
-			testDir := filepath.Join(testdataDir, testCase)
-			runner, err := replay.NewHTTPRunner(8079, "localhost:1234", testDir)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := runner.Replay(false); err != nil {
-				t.Error(err)
-			}
-		})
-	}
-}
+		for _, mode := range []string{"create", "update", "replay"} {
+			t.Run(fmt.Sprintf("%s-%s", testCase, mode), func(t *testing.T) {
+				var wg sync.WaitGroup
 
-func TestUpdateUnavailable(t *testing.T) {
-	testdataDir := findTestdataDir(t, "testdata/unavailable")
-	// TODO harcoded test case, can we do better?
-	testDir := filepath.Join(testdataDir, "foo")
-	runner, err := replay.NewHTTPRunner(8079, "localhost:1234", testDir)
-	if err != nil {
-		t.Error(err)
-	}
-	err = runner.Replay(true)
-	if err != nil {
-		t.Error(err)
-	}
-}
+				testDir := filepath.Join(testdataDir, testCase)
+				runner, err := replay.NewHTTPRunner(8079, "localhost:1234", testDir)
+				if err != nil {
+					t.Fatal(err)
+				}
 
-func TestRecordUnavailable(t *testing.T) {
-	testdataDir := findTestdataDir(t, "testdata/unavailable")
-	// TODO harcoded test case, can we do better?
-	testDir := filepath.Join(testdataDir, "foo")
-	runner, err := replay.NewHTTPRunner(8079, "localhost:1234", testDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+				switch {
+				case mode == "create":
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+						err := runner.Serve()
+						if err != nil {
+							t.Error(err)
+						}
+					}()
 
-		err := runner.Serve()
-		if err != nil {
-			t.Error(err)
+					<-runner.Ready()
+
+					// make http request
+					_, err := http.Get("http://localhost:8079/foo")
+					if err != nil {
+						t.Fatal(err)
+					}
+					_, err = http.Get("http://localhost:8079/stop")
+					if err != nil {
+						t.Fatal(err)
+					}
+				default:
+					if err := runner.Replay(mode == "update"); err != nil {
+						t.Error(err)
+					}
+				}
+
+				wg.Wait()
+			})
 		}
-	}()
-
-	<-runner.Ready()
-
-	// make http request
-	resp, err := http.Get("http://localhost:8079/foo")
-	if err != nil {
-		t.Fatal(err)
 	}
-	defer resp.Body.Close()
-
-	// read the body, the contents don't matter as that will be asserted by diff in recorded responses
-	_, err = io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = http.Get("http://localhost:8079/stop")
-	if err != nil {
-		t.Fatal(err)
-	}
-	wg.Wait()
 }
 
 // TODO add a test with expected diff so we can validate via runner_test
