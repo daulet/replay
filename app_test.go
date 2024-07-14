@@ -14,12 +14,6 @@ import (
 	"github.com/daulet/replay"
 )
 
-var (
-	create         = flag.Bool("create", false, "create (record) test case")
-	createTestName = flag.String("test_name", "newtest", "name of the test case to create")
-	update         = flag.Bool("update", false, "update recordings for existing test cases")
-)
-
 func TestMain(m *testing.M) {
 	flag.Parse()
 	m.Run()
@@ -43,11 +37,6 @@ func findTestdataDir(t *testing.T, relDir string) string {
 }
 
 func testCases(testdataDir string) ([]string, error) {
-	if *create {
-		// ignore if already exists
-		_ = os.Mkdir(fmt.Sprintf("%s/%s", testdataDir, *createTestName), 0o755)
-		return []string{*createTestName}, nil
-	}
 	files, err := os.ReadDir(testdataDir)
 	if err != nil {
 		wd, _ := os.Getwd()
@@ -75,36 +64,68 @@ func TestRunner(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase, func(t *testing.T) {
-			var wg sync.WaitGroup
-			ctx, cancel := context.WithCancel(context.Background())
+		for _, mode := range []string{"create", "update", "replay"} {
+			t.Run(fmt.Sprintf("%s-%s", testCase, mode), func(t *testing.T) {
+				var wg sync.WaitGroup
+				ctx, cancel := context.WithCancel(context.Background())
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				if err := serve(ctx, 8080); err != nil {
-					t.Error(err)
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					if err := serve(ctx, 8080); err != nil {
+						t.Error(err)
+					}
+				}()
+
+				testDir := filepath.Join(testdataDir, testCase)
+				runner, err := replay.NewHTTPRunner(8079, "localhost:8080", testDir)
+				if err != nil {
+					t.Fatal(err)
 				}
-			}()
 
-			testDir := filepath.Join(testdataDir, testCase)
-			runner, err := replay.NewHTTPRunner(8079, "localhost:8080", testDir)
-			if err != nil {
-				t.Fatal(err)
-			}
-			switch {
-			case *create:
-				err = runner.Serve()
-			default:
-				err = runner.Replay(*update)
-			}
-			if err != nil {
-				t.Error(err)
-			}
+				switch mode {
+				case "create":
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						err := runner.Serve()
+						if err != nil {
+							t.Error(err)
+						}
+					}()
 
-			cancel()
-			wg.Wait()
-		})
+					<-runner.Ready()
+
+					// make http request
+					resp, err := http.Get(fmt.Sprintf("http://localhost:8079/%s", testCase))
+					if err != nil {
+						t.Fatal(err)
+					}
+					// TODO do we even need to read body?
+					defer resp.Body.Close()
+
+					// read the body, the contents don't matter as that will be asserted by diff in recorded responses
+					_, err = io.ReadAll(resp.Body)
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					// stop test recording
+					_, err = http.Get("http://localhost:8079/stop")
+					if err != nil {
+						t.Fatal(err)
+					}
+				default:
+					err := runner.Replay(mode == "update")
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+
+				cancel()
+				wg.Wait()
+			})
+		}
 	}
 }
 
@@ -126,13 +147,7 @@ func TestUnreachable(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			switch {
-			case *create:
-				err = runner.Serve()
-			default:
-				err = runner.Replay(*update)
-			}
-			if err != nil {
+			if err := runner.Replay(false); err != nil {
 				t.Error(err)
 			}
 		})
