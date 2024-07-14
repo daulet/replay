@@ -167,7 +167,7 @@ func TestRecordUnavailable(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		err = runner.Serve()
+		err := runner.Serve()
 		if err != nil {
 			t.Error(err)
 		}
