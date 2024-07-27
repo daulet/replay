@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/daulet/replay/postgres"
 
@@ -22,7 +23,7 @@ func main() {
 	defer logger.Sync()
 
 	var (
-		ctx = context.Background()
+		ctx, cancel = context.WithCancel(context.Background())
 
 		replay = flag.Bool("replay", false, "record traffic")
 		port   = flag.Int("port", 0, "port to listen on")
@@ -31,10 +32,12 @@ func main() {
 		opts = []postgres.ProxyOption{
 			postgres.SavedRequest(func(reqID int) string {
 				// TODO parametrize testdata dir
-				return fmt.Sprintf("/testdata/%d.request", reqID)
+				// TODO remove relative path
+				return fmt.Sprintf("./testdata/%d.request", reqID)
 			}),
 			postgres.SavedResponse(func(reqID int) string {
-				return fmt.Sprintf("/testdata/%d.response", reqID)
+				// TODO remove relative path
+				return fmt.Sprintf("./testdata/%d.response", reqID)
 			}),
 			postgres.ProxyLogger(logger),
 		}
@@ -47,6 +50,14 @@ func main() {
 	}
 	opts = append(opts, reOpt)
 
+	go func() {
+		<-time.After(10 * time.Second)
+		cancel()
+	}()
+
+	// TODO do backoff
+	// <-time.After(5 * time.Second)
+	fmt.Println("starting proxy")
 	srv, err := postgres.NewProxy(*port, opts...)
 	if err != nil {
 		log.Fatal(err)

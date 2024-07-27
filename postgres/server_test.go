@@ -7,8 +7,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"sync"
@@ -20,6 +22,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -44,7 +47,7 @@ For historical reasons, the very first message sent by the client
 func TestParse(t *testing.T) {
 	t.Skip()
 	const request = true
-	f, err := os.Open("testdata/ingress")
+	f, err := os.Open("testparse/ingress")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,17 +133,30 @@ func TestPostgres(t *testing.T) {
 	defer logger.Sync()
 
 	tests := []struct {
-		name string
-		opt  postgres.ProxyOption
+		name   string
+		opts   []postgres.ProxyOption
+		cmpDir string
+		tarDir string
 	}{
 		{
-			// TODO don't override files, compare them instead
 			name: "record",
-			opt:  postgres.ProxyRecord(fmt.Sprintf("localhost:%d", dbPort)),
+			opts: []postgres.ProxyOption{
+				postgres.ProxyRecord(fmt.Sprintf("localhost:%d", dbPort)),
+				postgres.SavedRequest(func(reqID int) string {
+					return fmt.Sprintf("testtmp/%d.request", reqID)
+				}),
+				postgres.SavedResponse(func(reqID int) string {
+					return fmt.Sprintf("testtmp/%d.response", reqID)
+				}),
+			},
+			cmpDir: "testtmp",
+			tarDir: "testdata",
 		},
 		{
-			name: "replay",
-			opt:  postgres.ProxyReplay(),
+			name:   "replay",
+			opts:   []postgres.ProxyOption{postgres.ProxyReplay()},
+			cmpDir: "testdata",
+			tarDir: "testdata",
 		},
 	}
 
@@ -151,7 +167,8 @@ func TestPostgres(t *testing.T) {
 				ctx, cancel = context.WithCancel(context.Background())
 			)
 
-			srv, err := postgres.NewProxy(port, tt.opt, postgres.ProxyLogger(logger))
+			tt.opts = append(tt.opts, postgres.ProxyLogger(logger))
+			srv, err := postgres.NewProxy(port, tt.opts...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -234,6 +251,56 @@ func TestPostgres(t *testing.T) {
 			db.Close() // close connection to proxy
 			cancel()   // signal proxy to stop
 			wg.Wait()  // wait for proxy to stop
+
+			{
+				gotFiles, err := ioutil.ReadDir(tt.cmpDir)
+				if err != nil {
+					t.Fatal(err)
+				}
+				gotFilesMap := make(map[string]struct{})
+				for _, f := range gotFiles {
+					gotFilesMap[f.Name()] = struct{}{}
+				}
+				wantFiles, err := ioutil.ReadDir(tt.tarDir)
+				if err != nil {
+					t.Fatal(err)
+				}
+				wantFilesMap := make(map[string]struct{})
+				for _, f := range wantFiles {
+					wantFilesMap[f.Name()] = struct{}{}
+				}
+
+				for _, f := range gotFiles {
+					if _, ok := wantFilesMap[f.Name()]; !ok {
+						t.Errorf("unexpected file %s", f.Name())
+					}
+				}
+				for _, f := range wantFiles {
+					if _, ok := gotFilesMap[f.Name()]; !ok {
+						t.Errorf("missing file %s", f.Name())
+						continue
+					}
+					dmp := diffmatchpatch.New()
+
+					wantTxt, err := ioutil.ReadFile(filepath.Join(tt.tarDir, f.Name()))
+					if err != nil {
+						t.Fatal(err)
+					}
+					gotTxt, err := ioutil.ReadFile(filepath.Join(tt.cmpDir, f.Name()))
+					if err != nil {
+						t.Fatal(err)
+					}
+					diffs := dmp.DiffMain(string(wantTxt), string(gotTxt), false)
+					if len(diffs) > 1 {
+						t.Errorf("unexpected diff in %s", f.Name())
+						t.Error(dmp.DiffPrettyText(diffs))
+					}
+				}
+
+				if tt.cmpDir != tt.tarDir {
+					os.RemoveAll(tt.cmpDir)
+				}
+			}
 		})
 	}
 }

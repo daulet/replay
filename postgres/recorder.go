@@ -46,7 +46,7 @@ func newRecorder(log *zap.Logger, addr string, reqFileFunc, respFileFunc replay.
 	}
 
 	var (
-		chIW = make(chan byte)
+		chIW = make(chan byte, 1)
 		chIR = make(chan byte)
 		chEW = make(chan byte)
 		chER = make(chan byte)
@@ -70,6 +70,8 @@ func newRecorder(log *zap.Logger, addr string, reqFileFunc, respFileFunc replay.
 
 	writer := internal.NewWriter(reqFileFunc, respFileFunc)
 	reqTee := writer.RequestWriter()
+	// TODO requests are known length from parsing, so maybe make explicit signal when message request is done
+	// otherwise you get weird request fragmentation, repro with -count=100 -race
 	resTee := writer.ResponseWriter()
 
 	wg.Add(1)
@@ -136,6 +138,9 @@ func parseMessages(log *zap.Logger, chW chan byte, chR chan<- byte) {
 			}
 			writeN(chR, fixedProcessID)
 			writeN(chR, fixedSecretKey)
+		case 'R': // Authentication
+			writeN(chR, readN(chW, length-4))
+
 		case 'S': // ParameterStatus
 			vals := readStrings(readN(chW, length-4))
 			if vals[0] == "server_version" {
@@ -187,6 +192,7 @@ func (r *recorder) Read(p []byte) (int, error) {
 }
 
 func (r *recorder) Write(p []byte) (int, error) {
+	// TODO maybe this should block on signal from parseMessages?
 	for _, b := range p {
 		r.chIW <- b
 	}

@@ -37,15 +37,19 @@ func newReplayer(log *zap.Logger, reqFileFunc, respFileFunc replay.FilenameFunc)
 		}
 		f.Close()
 
-		f, err = os.Open(respFileFunc(reqID))
-		if err != nil {
-			return nil, err
+		// TODO is no response okay? Maybe we are closing inside tests too soon?
+		var resp []byte
+		{
+			f, err = os.Open(respFileFunc(reqID))
+			// no response is okay
+			if err == nil {
+				resp, err = io.ReadAll(f)
+				if err != nil {
+					return nil, err
+				}
+				f.Close()
+			}
 		}
-		resp, err := io.ReadAll(f)
-		if err != nil {
-			return nil, err
-		}
-		f.Close()
 		hash := sha256.Sum256(req)
 		responses[hash] = append(responses[hash], resp)
 		reqID++
