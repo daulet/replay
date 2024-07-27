@@ -1,0 +1,18 @@
+TODO add separate check in CI that no changes were made to repo
+after running tests
+
+forget about adding coverage via ./examples/http/..., seems convoluted and requires go workspace, just add direct tests in root
+
+add github actions and check coverage - how do we test test creation and update?
+go test -v -coverpkg=. -coverprofile=profile.cov ./... ./examples/http/...
+
+migrate to txtar format for test data: https://youtu.be/1-o-iJlL4ak?si=IUWyfqq_Rt_2M20C&t=1619
+use https://github.com/rsc/script to assert that tests print current diff when replay catches a difference
+
+complete HTTP working example
+review TODOs, watch out for unhandled errors, fix commented out logging
+add a test to test output of negative cases - to verify diff
+then do TCP version and see if it works with something like Redis
+tests for different modes: create/update/replay - replay is automatic, but the others need automation too
+better message when recording not found, perhaps find closest match or at least suggest to recording
+
